@@ -1,5 +1,6 @@
 # Consistent with Kohya/A1111 to reduce differences between model training and inference.
 
+import contextlib
 import os
 import torch
 import ldm_patched.controlnet.cldm
@@ -78,8 +79,10 @@ def patched_SDClipModel__init__(self, max_length=77, freeze=True, layer="last", 
     config = CLIPTextConfig.from_json_file(textmodel_json_config)
     self.num_layers = config.num_hidden_layers
 
+    _no_init = getattr(modeling_utils, 'no_init_weights', None)
+    _no_init_ctx = _no_init() if callable(_no_init) else contextlib.nullcontext()
     with use_patched_ops(ops.manual_cast):
-        with modeling_utils.no_init_weights():
+        with _no_init_ctx:
             self.transformer = CLIPTextModel(config)
 
     if dtype is not None:
