@@ -9,6 +9,14 @@ from PIL.PngImagePlugin import PngInfo
 from modules.flags import OutputFormat
 from modules.meta_parser import MetadataParser, get_exif
 from modules.util import generate_temp_filename
+from modules import metadata_spoof
+
+# Metadata spoofing settings — override via UI or set directly
+spoof_enabled: bool = False
+spoof_camera_profile: str = metadata_spoof.DEFAULT_CAMERA
+spoof_gps_coords: tuple | None = None
+spoof_gps_jitter: bool = True
+spoof_photographer: str | None = None
 
 log_cache = {}
 
@@ -30,18 +38,37 @@ def log(img, metadata, metadata_parser: MetadataParser | None = None, output_for
     parsed_parameters = metadata_parser.to_string(metadata.copy()) if metadata_parser is not None else ''
     image = Image.fromarray(img)
 
+    # Build spoofed EXIF bytes once if enabled (used for JPEG/WEBP)
+    spoofed_exif: bytes | None = None
+    if spoof_enabled and metadata_spoof.is_available():
+        spoofed_exif = metadata_spoof.apply_camera_exif(
+            camera_profile=spoof_camera_profile,
+            gps_coords=spoof_gps_coords,
+            gps_jitter=spoof_gps_jitter,
+            custom_photographer=spoof_photographer,
+        )
+
     if output_format == OutputFormat.PNG.value:
-        if parsed_parameters != '':
+        if spoof_enabled:
+            # When spoofing: save without AI parameters metadata
+            image.save(local_temp_filename)
+        elif parsed_parameters != '':
             pnginfo = PngInfo()
             pnginfo.add_text('parameters', parsed_parameters)
             pnginfo.add_text('fooocus_scheme', metadata_parser.get_scheme().value)
+            image.save(local_temp_filename, pnginfo=pnginfo)
         else:
-            pnginfo = None
-        image.save(local_temp_filename, pnginfo=pnginfo)
+            image.save(local_temp_filename)
     elif output_format == OutputFormat.JPEG.value:
-        image.save(local_temp_filename, quality=95, optimize=True, progressive=True, exif=get_exif(parsed_parameters, metadata_parser.get_scheme().value) if metadata_parser else Image.Exif())
+        if spoofed_exif:
+            image.save(local_temp_filename, quality=95, optimize=True, progressive=True, exif=spoofed_exif)
+        else:
+            image.save(local_temp_filename, quality=95, optimize=True, progressive=True, exif=get_exif(parsed_parameters, metadata_parser.get_scheme().value) if metadata_parser else Image.Exif())
     elif output_format == OutputFormat.WEBP.value:
-        image.save(local_temp_filename, quality=95, lossless=False, exif=get_exif(parsed_parameters, metadata_parser.get_scheme().value) if metadata_parser else Image.Exif())
+        if spoofed_exif:
+            image.save(local_temp_filename, quality=95, lossless=False, exif=spoofed_exif)
+        else:
+            image.save(local_temp_filename, quality=95, lossless=False, exif=get_exif(parsed_parameters, metadata_parser.get_scheme().value) if metadata_parser else Image.Exif())
     else:
         image.save(local_temp_filename)
 

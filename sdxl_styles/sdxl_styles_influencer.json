@@ -1,0 +1,62 @@
+[
+    {
+        "name": "Influencer Gym Shoot",
+        "prompt": "photograph of {prompt}, gym fitness photoshoot, athletic wear, professional gym lighting, high-end fitness studio, sharp focus, Canon EOS R5, 85mm lens, f/2.0, natural skin texture, sweat glistening, motivated expression",
+        "negative_prompt": "cartoon, anime, painting, 3d render, watermark, text, deformed, bad anatomy, extra limbs, poorly lit, flat lighting, amateur photography"
+    },
+    {
+        "name": "Influencer Fashion Editorial",
+        "prompt": "editorial fashion photograph of {prompt}, high-fashion magazine spread, professional studio lighting, designer clothing, clean white or gradient background, sharp detail, Vogue aesthetic, Sony A7IV, 50mm, f/1.8",
+        "negative_prompt": "casual, low quality, blurry, amateur, cartoon, watermark, text, deformed, bad anatomy, extra limbs"
+    },
+    {
+        "name": "Influencer Instagram Lifestyle",
+        "prompt": "lifestyle photograph of {prompt}, candid Instagram aesthetic, golden hour natural light, outdoor urban setting, casual chic outfit, boho vibes, warm color grade, shot on iPhone 15 Pro Max",
+        "negative_prompt": "studio, harsh lighting, formal, watermark, text, deformed, bad anatomy, cartoon, 3d render, blurry"
+    },
+    {
+        "name": "Influencer Beachwear",
+        "prompt": "beach photograph of {prompt}, summer beachwear photoshoot, tropical beach background, golden sand, turquoise water, warm sunlight, swimwear editorial, professional beach photography, Canon EOS R5, 85mm",
+        "negative_prompt": "indoor, cold, winter, watermark, text, deformed, bad anatomy, cartoon, 3d render, blurry, poorly lit"
+    },
+    {
+        "name": "Influencer Activewear",
+        "prompt": "activewear photograph of {prompt}, premium activewear editorial, sports brand lookbook, outdoor running path or modern gym, dynamic pose, energetic, razor-sharp focus, Nike/Adidas aesthetic, Sony A7IV",
+        "negative_prompt": "casual clothes, formal wear, watermark, text, deformed, bad anatomy, cartoon, 3d render, blurry"
+    },
+    {
+        "name": "Influencer Yoga & Wellness",
+        "prompt": "yoga lifestyle photograph of {prompt}, wellness and mindfulness shoot, soft morning light, serene outdoor setting or zen studio, yoga pose, lululemon aesthetic, earthy tones, shallow depth of field, Sony A7IV 85mm f/1.8",
+        "negative_prompt": "gym equipment, urban, dark, harsh lighting, watermark, text, deformed, bad anatomy, cartoon, 3d render"
+    },
+    {
+        "name": "Influencer Athleisure Street",
+        "prompt": "street fashion photograph of {prompt}, athleisure street style, urban city background, contemporary fashion district, stylish sneakers, trendy streetwear, natural overcast light, editorial composition, Leica Q3",
+        "negative_prompt": "beach, gym, studio, tropical, watermark, text, deformed, bad anatomy, cartoon, 3d render, blurry"
+    },
+    {
+        "name": "Influencer Luxury Hotel",
+        "prompt": "luxury lifestyle photograph of {prompt}, five-star hotel suite, luxury travel influencer aesthetic, designer luggage, floor-to-ceiling windows, city skyline view, elegant outfit, warm interior lighting, Sony A7IV 35mm",
+        "negative_prompt": "outdoor, gym, beach, watermark, text, deformed, bad anatomy, cartoon, 3d render, blurry, low quality"
+    },
+    {
+        "name": "Influencer Cafe & Brunch",
+        "prompt": "lifestyle photograph of {prompt}, trendy cafe brunch aesthetic, cozy coffee shop setting, natural window light, iced latte in hand, casual chic outfit, warm bokeh background, Instagram food blogging vibes, iPhone 15 Pro Max",
+        "negative_prompt": "outdoor nature, gym, beach, watermark, text, deformed, bad anatomy, cartoon, 3d render, dark lighting"
+    },
+    {
+        "name": "Influencer Rooftop Sunset",
+        "prompt": "golden hour rooftop photograph of {prompt}, rooftop party or sunset shoot, urban skyline backdrop, warm orange and pink sky, influencer chic outfit, cocktail in hand or posing naturally, Canon EOS R5 50mm f/1.4",
+        "negative_prompt": "daytime, indoor, gym, beach, watermark, text, deformed, bad anatomy, cartoon, 3d render, blurry"
+    },
+    {
+        "name": "Influencer Skincare & Beauty",
+        "prompt": "beauty photograph of {prompt}, skincare editorial, clean dewy skin, minimal makeup, neutral studio background, soft diffused lighting, beauty brand aesthetic, Sony A7IV 100mm macro, extreme detail, skin texture visible",
+        "negative_prompt": "heavy makeup, dramatic, dark, outdoor, gym, watermark, text, deformed, bad anatomy, cartoon, 3d render"
+    },
+    {
+        "name": "Influencer Pool Day",
+        "prompt": "pool lifestyle photograph of {prompt}, luxury pool day shoot, infinity pool with ocean view, designer swimwear, Hollywood Hills or Ibiza villa, afternoon sun, polarized color palette, aspirational influencer aesthetic, Canon EOS R5",
+        "negative_prompt": "gym, indoor, winter, cold, watermark, text, deformed, bad anatomy, cartoon, 3d render, blurry, poorly lit"
+    }
+]
