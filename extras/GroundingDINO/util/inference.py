@@ -8,8 +8,12 @@ from modules.model_loader import load_file_from_url
 import numpy as np
 import supervision as sv
 import torch
-from groundingdino.util.inference import Model
-from groundingdino.util.inference import load_model, preprocess_caption, get_phrases_from_posmap
+try:
+    from groundingdino.util.inference import Model
+    from groundingdino.util.inference import load_model, preprocess_caption, get_phrases_from_posmap
+except ImportError:
+    Model = object
+    load_model = preprocess_caption = get_phrases_from_posmap = None
 
 
 class GroundingDinoModel(Model):
