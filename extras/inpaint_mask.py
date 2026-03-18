@@ -7,7 +7,10 @@ try:
     from extras.GroundingDINO.util.inference import default_groundingdino
 except ImportError:
     default_groundingdino = None
-from extras.sam.predictor import SamPredictor
+try:
+    from extras.sam.predictor import SamPredictor
+except ImportError:
+    SamPredictor = None
 try:
     from rembg import remove, new_session
 except ImportError:

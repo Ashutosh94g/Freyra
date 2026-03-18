@@ -9,11 +9,14 @@ import torch
 from ldm_patched.modules import model_management
 from ldm_patched.modules.model_patcher import ModelPatcher
 
-from segment_anything.modeling import Sam
+try:
+    from segment_anything.modeling import Sam
+    from segment_anything.utils.transforms import ResizeLongestSide
+except ImportError:
+    Sam = None
+    ResizeLongestSide = None
 
 from typing import Optional, Tuple
-
-from segment_anything.utils.transforms import ResizeLongestSide
 
 
 class SamPredictor:
