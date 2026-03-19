@@ -1,5 +1,5 @@
 {
-    "default_model": "RealVisXL_V5.0.safetensors",
+    "default_model": "RealVisXL_V5.0_fp16.safetensors",
     "default_refiner": "None",
     "default_refiner_switch": 0.5,
     "default_loras": [
@@ -44,7 +44,7 @@
     "default_aspect_ratio": "896*1152",
     "default_overwrite_step": -1,
     "checkpoint_downloads": {
-        "RealVisXL_V5.0.safetensors": "https://huggingface.co/SG161222/RealVisXL_V5.0/resolve/main/RealVisXL_V5.0.safetensors"
+        "RealVisXL_V5.0_fp16.safetensors": "https://huggingface.co/SG161222/RealVisXL_V5.0/resolve/main/RealVisXL_V5.0_fp16.safetensors"
     },
     "embeddings_downloads": {},
     "lora_downloads": {
