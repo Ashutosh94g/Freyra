@@ -1,4 +1,5 @@
 import threading
+import gc
 
 from extras.inpaint_mask import generate_mask_from_image, SAMOptions
 from modules.patch import PatchSettings, patch_settings, patch_all
@@ -1282,6 +1283,9 @@ def worker():
             progressbar(async_task, current_progress, f'Preparing task {current_task_id + 1}/{async_task.image_number} ...')
             execution_start_time = time.perf_counter()
 
+            # Flush VRAM before each image to prevent accumulation across a batch
+            ldm_patched.modules.model_management.soft_empty_cache()
+
             try:
                 imgs, img_paths, current_progress = process_task(all_steps, async_task, callback, controlnet_canny_path,
                                                                  controlnet_cpds_path, current_task_id,
@@ -1295,6 +1299,14 @@ def worker():
                 current_progress = int(preparation_steps + (100 - preparation_steps) / float(all_steps) * async_task.steps * (current_task_id + 1))
                 images_to_enhance += imgs
 
+            except torch.cuda.OutOfMemoryError as e:
+                print(f'[OOM] CUDA out of memory on image {current_task_id + 1}: {e}')
+                ldm_patched.modules.model_management.soft_empty_cache()
+                gc.collect()
+                async_task.yields.append(['preview', (current_progress,
+                    f'Out of memory on image {current_task_id + 1} — try a lower resolution or fewer LoRAs.', None)])
+                continue
+
             except ldm_patched.modules.model_management.InterruptProcessingException:
                 if async_task.last_stop == 'skip':
                     print('User skipped')
@@ -1305,6 +1317,8 @@ def worker():
                     break
 
             del task['c'], task['uc']  # Save memory
+            ldm_patched.modules.model_management.soft_empty_cache()
+            gc.collect()
             execution_time = time.perf_counter() - execution_start_time
             print(f'Generating and saving time: {execution_time:.2f} seconds')
 
@@ -1474,6 +1488,8 @@ def worker():
                 task.yields.append(['finish', task.results])
                 pipeline.prepare_text_encoder(async_call=True)
             except:
+                ldm_patched.modules.model_management.soft_empty_cache()
+                gc.collect()
                 traceback.print_exc()
                 task.yields.append(['finish', task.results])
             finally:

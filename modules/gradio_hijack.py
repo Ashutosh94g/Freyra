@@ -494,31 +494,36 @@ gradio.routes.asyncio.wait_for = patched_wait_for
 #   - process_completed is sent to the frontend before the finally-disconnect runs
 #   - the .then() restore-buttons chain fires and the UI unfreezes
 import gradio.utils
-if not hasattr(gradio.utils.AsyncRequest, '_json_response_data'):
+import inspect as _inspect
+# Guard: AsyncRequest was removed in Gradio 3.45+ (queue switched to WebSockets).
+# Only patch when running the older HTTP-based queue (Gradio 3.41.x).
+if hasattr(gradio.utils, 'AsyncRequest') and not hasattr(gradio.utils.AsyncRequest, '_json_response_data'):
     gradio.utils.AsyncRequest._json_response_data = {}
 
 # Fix root cause: the queue's internal httpx.AsyncClient uses the default 5-second
 # timeout. When generate_clicked takes >5 s between yields (loading IP-Adapter
 # control models) the POST to /api/predict times out, triggering the error above.
 # We patch Queue.start to replace the client with one that has no read timeout.
+# Guard: In Gradio 3.45+ the queue switched to WebSockets; Queue.start() became a
+# synchronous method and the httpx client is no longer used for polling. Only apply
+# the patch when Queue.start is still the async HTTP-polling version (3.41.x).
 import gradio.queueing
 import httpx as _httpx
 
 _original_queue_start = gradio.queueing.Queue.start
 
+if _inspect.iscoroutinefunction(_original_queue_start):
+    async def _patched_queue_start(self, ssl_verify=True):
+        await _original_queue_start(self, ssl_verify=ssl_verify)
+        # Replace the client created by the original start with a no-timeout one
+        try:
+            await self.queue_client.aclose()
+        except Exception:
+            pass
+        self.queue_client = _httpx.AsyncClient(
+            verify=ssl_verify,
+            timeout=_httpx.Timeout(None),
+        )
 
-async def _patched_queue_start(self, ssl_verify=True):
-    await _original_queue_start(self, ssl_verify=ssl_verify)
-    # Replace the client created by the original start with a no-timeout one
-    try:
-        await self.queue_client.aclose()
-    except Exception:
-        pass
-    self.queue_client = _httpx.AsyncClient(
-        verify=ssl_verify,
-        timeout=_httpx.Timeout(None),
-    )
-
-
-gradio.queueing.Queue.start = _patched_queue_start
+    gradio.queueing.Queue.start = _patched_queue_start
 

@@ -11,7 +11,8 @@ cd /d "%~dp0"
 
 python launch.py ^
   --preset influencer ^
-  --always-high-vram ^
-  --unet-in-fp8-e4m3fn
+  --always-gpu ^
+  --unet-in-fp8-e4m3fn ^
+  --attention-pytorch
 
 pause
