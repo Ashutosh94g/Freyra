@@ -160,8 +160,9 @@ def patched_ClipVisionModel__init__(self, json_config):
     else:
         self.dtype = torch.float32
 
+    _no_init = getattr(modeling_utils, 'no_init_weights', contextlib.nullcontext)
     with use_patched_ops(ops.manual_cast):
-        with modeling_utils.no_init_weights():
+        with _no_init():
             self.model = CLIPVisionModelWithProjection(config)
 
     self.model.to(self.dtype)
