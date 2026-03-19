@@ -481,3 +481,44 @@ def patched_wait_for(fut, timeout):
 
 gradio.routes.asyncio.wait_for = patched_wait_for
 
+
+# Fix: Gradio 3.41.2 AsyncRequest leaves _json_response_data unset when an HTTP
+# request fails (e.g. httpx read-timeout while the generator is busy loading
+# control models).  The queue's while-is_generating loop then raises
+#   AttributeError: 'AsyncRequest' object has no attribute '_json_response_data'
+# which bypasses the normal process_completed path and leaves the UI frozen.
+#
+# Setting a class-level default of {} means:
+#   - failed requests return {} from the .json property instead of raising
+#   - while response.json.get("is_generating", False) -> False -> loop exits cleanly
+#   - process_completed is sent to the frontend before the finally-disconnect runs
+#   - the .then() restore-buttons chain fires and the UI unfreezes
+import gradio.utils
+if not hasattr(gradio.utils.AsyncRequest, '_json_response_data'):
+    gradio.utils.AsyncRequest._json_response_data = {}
+
+# Fix root cause: the queue's internal httpx.AsyncClient uses the default 5-second
+# timeout. When generate_clicked takes >5 s between yields (loading IP-Adapter
+# control models) the POST to /api/predict times out, triggering the error above.
+# We patch Queue.start to replace the client with one that has no read timeout.
+import gradio.queueing
+import httpx as _httpx
+
+_original_queue_start = gradio.queueing.Queue.start
+
+
+async def _patched_queue_start(self, ssl_verify=True):
+    await _original_queue_start(self, ssl_verify=ssl_verify)
+    # Replace the client created by the original start with a no-timeout one
+    try:
+        await self.queue_client.aclose()
+    except Exception:
+        pass
+    self.queue_client = _httpx.AsyncClient(
+        verify=ssl_verify,
+        timeout=_httpx.Timeout(None),
+    )
+
+
+gradio.queueing.Queue.start = _patched_queue_start
+
