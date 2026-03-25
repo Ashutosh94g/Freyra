@@ -24,6 +24,33 @@ if not hasattr(_hf_hub, 'HfFolder'):
                 pass
     _hf_hub.HfFolder = _HfFolder
 
+# ── gradio_client JSON schema bug fix ───────────────────────────────
+# gradio_client's _json_schema_to_python_type crashes when a schema value
+# is a bool (e.g. additionalProperties: true) because it does `"const" in True`.
+# Patch get_type to guard against non-dict schema values.
+try:
+    import gradio_client.utils as _gc_utils
+    _original_get_type = _gc_utils.get_type
+
+    def _patched_get_type(schema):
+        if not isinstance(schema, dict):
+            return "Any"
+        return _original_get_type(schema)
+
+    _gc_utils.get_type = _patched_get_type
+
+    # Also guard _json_schema_to_python_type entry point
+    _original_jstpt = _gc_utils._json_schema_to_python_type
+
+    def _patched_jstpt(schema, defs=None):
+        if not isinstance(schema, dict):
+            return "Any"
+        return _original_jstpt(schema, defs)
+
+    _gc_utils._json_schema_to_python_type = _patched_jstpt
+except Exception:
+    pass
+
 # Suppress known harmless warnings that clutter Colab output
 warnings.filterwarnings('ignore', message='You have unused kwarg parameters.*', category=UserWarning)
 warnings.filterwarnings('ignore', message='Using the update method is deprecated.*', category=UserWarning)
