@@ -342,8 +342,8 @@ class LoadedModel:
         return self.model is other.model
 
 def minimum_inference_memory():
-    # Raised from 2 GB to 3 GB for T4 (15 GB VRAM) stability with fp8 UNet + 2 LoRAs at 896x1152.
-    return (3 * 1024 * 1024 * 1024)
+    # Raised from 3 GB to 3.5 GB for T4 (15 GB VRAM) stability with fp8 UNet + 4 LoRAs at 896x1152.
+    return (3.5 * 1024 * 1024 * 1024)
 
 def unload_model_clones(model):
     to_unload = []

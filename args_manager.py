@@ -40,6 +40,28 @@ args_parser.parser.add_argument("--always-download-new-model", action='store_tru
 args_parser.parser.add_argument("--rebuild-hash-cache", help="Generates missing model and LoRA hashes.",
                                 type=int, nargs="?", metavar="CPU_NUM_THREADS", const=-1)
 
+# --- Phase 5: Generation default overrides via CLI ---
+args_parser.parser.add_argument("--default-prompt", type=str, default=None,
+                                help="Override default prompt text.")
+args_parser.parser.add_argument("--default-negative", type=str, default=None,
+                                help="Override default negative prompt text.")
+args_parser.parser.add_argument("--default-steps", type=int, default=None,
+                                help="Override default step count (ignores performance mode steps).")
+args_parser.parser.add_argument("--default-cfg", type=float, default=None,
+                                help="Override default CFG scale.")
+args_parser.parser.add_argument("--default-sampler", type=str, default=None,
+                                help="Override default sampler name.")
+args_parser.parser.add_argument("--default-scheduler", type=str, default=None,
+                                help="Override default scheduler name.")
+args_parser.parser.add_argument("--default-resolution", type=str, default=None,
+                                help="Override default aspect ratio, e.g. '896*1152'.")
+args_parser.parser.add_argument("--image-number", type=int, default=None,
+                                help="Override default number of images per generation.")
+args_parser.parser.add_argument("--seed", type=int, default=None,
+                                help="Override default seed (-1 for random).")
+args_parser.parser.add_argument("--default-loras", type=str, default=None,
+                                help='Override LoRAs as JSON, e.g. \'[[true,"lora.safetensors",0.5]]\'.')
+
 args_parser.parser.set_defaults(
     disable_cuda_malloc=True,
     in_browser=True,

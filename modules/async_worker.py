@@ -159,6 +159,118 @@ class AsyncTask:
         self.images_to_enhance_count = 0
         self.enhance_stats = {}
 
+    @classmethod
+    def from_dict(cls, params: dict):
+        """Create an AsyncTask from a dictionary of parameters (for API use).
+        Missing parameters get sensible defaults from modules/config.py."""
+        from modules.flags import Performance, MetadataScheme, ip_list, disabled
+        from modules.util import get_enabled_loras
+        import modules.config as config
+
+        task = cls(args=[])
+
+        # Core generation params
+        task.prompt = params.get('prompt', config.default_prompt)
+        task.negative_prompt = params.get('negative_prompt', config.default_prompt_negative)
+        task.style_selections = params.get('styles', config.default_styles)
+        task.performance_selection = Performance(params.get('performance', config.default_performance))
+        task.steps = task.performance_selection.steps()
+        task.original_steps = task.steps
+        task.aspect_ratios_selection = params.get('aspect_ratio', config.default_aspect_ratio.split('\u00d7')[0].strip() if '\u00d7' in str(config.default_aspect_ratio) else str(config.default_aspect_ratio))
+        task.image_number = params.get('image_number', config.default_image_number)
+        task.output_format = params.get('output_format', config.default_output_format)
+        task.seed = int(params.get('seed', -1))
+        task.read_wildcards_in_order = params.get('read_wildcards_in_order', False)
+        task.sharpness = params.get('sharpness', config.default_sample_sharpness)
+        task.cfg_scale = params.get('cfg_scale', config.default_cfg_scale)
+        task.base_model_name = params.get('base_model', config.default_base_model_name)
+        task.refiner_model_name = params.get('refiner_model', config.default_refiner_model_name)
+        task.refiner_switch = params.get('refiner_switch', config.default_refiner_switch)
+        task.generate_image_grid = params.get('generate_image_grid', False)
+
+        # LoRAs
+        lora_input = params.get('loras', config.default_loras)
+        loras_raw = [(bool(l[0]), str(l[1]), float(l[2])) for l in lora_input]
+        task.loras = get_enabled_loras(loras_raw)
+
+        # Image input (disabled by default for API text-to-image)
+        task.input_image_checkbox = params.get('input_image_checkbox', False)
+        task.current_tab = params.get('current_tab', 'uov')
+        task.uov_method = params.get('uov_method', disabled)
+        task.uov_input_image = params.get('uov_input_image', None)
+        task.outpaint_selections = params.get('outpaint_selections', [])
+        task.inpaint_input_image = params.get('inpaint_input_image', None)
+        task.inpaint_additional_prompt = params.get('inpaint_additional_prompt', '')
+        task.inpaint_mask_image_upload = params.get('inpaint_mask_image_upload', None)
+
+        # Advanced settings
+        task.disable_preview = params.get('disable_preview', True)
+        task.disable_intermediate_results = params.get('disable_intermediate_results', True)
+        task.disable_seed_increment = params.get('disable_seed_increment', False)
+        task.black_out_nsfw = params.get('black_out_nsfw', config.default_black_out_nsfw)
+        task.adm_scaler_positive = params.get('adm_scaler_positive', 1.5)
+        task.adm_scaler_negative = params.get('adm_scaler_negative', 0.8)
+        task.adm_scaler_end = params.get('adm_scaler_end', 0.3)
+        task.adaptive_cfg = params.get('adaptive_cfg', config.default_cfg_tsnr)
+        task.clip_skip = params.get('clip_skip', config.default_clip_skip)
+        task.sampler_name = params.get('sampler', config.default_sampler)
+        task.scheduler_name = params.get('scheduler', config.default_scheduler)
+        task.vae_name = params.get('vae', config.default_vae)
+        task.overwrite_step = params.get('overwrite_step', config.default_overwrite_step)
+        task.overwrite_switch = params.get('overwrite_switch', -1)
+        task.overwrite_width = params.get('overwrite_width', -1)
+        task.overwrite_height = params.get('overwrite_height', -1)
+        task.overwrite_vary_strength = params.get('overwrite_vary_strength', -1)
+        task.overwrite_upscale_strength = params.get('overwrite_upscale_strength', -1)
+        task.mixing_image_prompt_and_vary_upscale = params.get('mixing_image_prompt_and_vary_upscale', False)
+        task.mixing_image_prompt_and_inpaint = params.get('mixing_image_prompt_and_inpaint', False)
+        task.debugging_cn_preprocessor = params.get('debugging_cn_preprocessor', False)
+        task.skipping_cn_preprocessor = params.get('skipping_cn_preprocessor', False)
+        task.canny_low_threshold = params.get('canny_low_threshold', 64)
+        task.canny_high_threshold = params.get('canny_high_threshold', 128)
+        task.refiner_swap_method = params.get('refiner_swap_method', 'joint')
+        task.controlnet_softness = params.get('controlnet_softness', 0.25)
+        task.freeu_enabled = params.get('freeu_enabled', False)
+        task.freeu_b1 = params.get('freeu_b1', 1.01)
+        task.freeu_b2 = params.get('freeu_b2', 1.02)
+        task.freeu_s1 = params.get('freeu_s1', 0.99)
+        task.freeu_s2 = params.get('freeu_s2', 0.95)
+        task.debugging_inpaint_preprocessor = params.get('debugging_inpaint_preprocessor', False)
+        task.inpaint_disable_initial_latent = params.get('inpaint_disable_initial_latent', False)
+        task.inpaint_engine = params.get('inpaint_engine', config.default_inpaint_engine_version)
+        task.inpaint_strength = params.get('inpaint_strength', 1.0)
+        task.inpaint_respective_field = params.get('inpaint_respective_field', 0.618)
+        task.inpaint_advanced_masking_checkbox = params.get('inpaint_advanced_masking_checkbox', False)
+        task.invert_mask_checkbox = params.get('invert_mask_checkbox', False)
+        task.inpaint_erode_or_dilate = params.get('inpaint_erode_or_dilate', 0)
+        task.save_final_enhanced_image_only = params.get('save_final_enhanced_image_only', False)
+        task.save_metadata_to_images = params.get('save_metadata_to_images', config.default_save_metadata_to_images)
+        task.metadata_scheme = MetadataScheme(params.get('metadata_scheme', config.default_metadata_scheme))
+
+        # ControlNet (empty for text-to-image API)
+        task.cn_tasks = {x: [] for x in ip_list}
+
+        # Enhance (disabled for API)
+        task.enhance_input_image = None
+        task.enhance_checkbox = False
+        task.enhance_uov_method = disabled
+        task.enhance_uov_processing_order = params.get('enhance_uov_processing_order', 'Before First Enhancement')
+        task.enhance_uov_prompt_type = params.get('enhance_uov_prompt_type', 'original')
+        task.enhance_ctrls = []
+        task.should_enhance = False
+        task.images_to_enhance_count = 0
+        task.enhance_stats = {}
+
+        # Debugging (DINO)
+        task.debugging_dino = False
+        task.dino_erode_or_dilate = 0
+        task.debugging_enhance_masks_checkbox = False
+
+        # Store original args for backward compat
+        task.args = ['from_api']
+
+        return task
+
 async_tasks = []
 
 

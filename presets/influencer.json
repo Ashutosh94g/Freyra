@@ -10,18 +10,18 @@
         ],
         [
             true,
-            "None",
-            1.0
+            "add-detail-xl.safetensors",
+            0.4
         ],
         [
             true,
-            "None",
-            1.0
+            "epiCPhoto.safetensors",
+            0.3
         ],
         [
             true,
-            "None",
-            1.0
+            "DetailTweaker_xl.safetensors",
+            0.25
         ],
         [
             true,
@@ -48,7 +48,10 @@
     },
     "embeddings_downloads": {},
     "lora_downloads": {
-        "SDXL_FILM_PHOTOGRAPHY_STYLE_V1.safetensors": "https://huggingface.co/mashb1t/fav_models/resolve/main/fav/SDXL_FILM_PHOTOGRAPHY_STYLE_V1.safetensors"
+        "SDXL_FILM_PHOTOGRAPHY_STYLE_V1.safetensors": "https://huggingface.co/mashb1t/fav_models/resolve/main/fav/SDXL_FILM_PHOTOGRAPHY_STYLE_V1.safetensors",
+        "add-detail-xl.safetensors": "https://huggingface.co/PvDeep/Add-Detail-XL/resolve/main/add-detail-xl.safetensors",
+        "epiCPhoto.safetensors": "https://huggingface.co/AiWise/epiCPhoto-XL-LoRA-Derp2/resolve/main/epiCPhotoXL-LoRA-Derp2.safetensors",
+        "DetailTweaker_xl.safetensors": "https://huggingface.co/imagepipeline/Detail-Tweaker-XL/resolve/main/239209ad-d39d-471f-805e-3af555ca5681.safetensors"
     },
     "previous_default_models": []
 }

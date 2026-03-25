@@ -1117,6 +1117,10 @@ def dump_default_english_config():
 
 # dump_default_english_config()
 
+# Mount REST API on the Gradio app's underlying FastAPI instance
+from modules.api import api_app
+shared.gradio_root.app.mount("/api/v1", api_app)
+
 shared.gradio_root.launch(
     inbrowser=args_manager.args.in_browser,
     server_name=args_manager.args.listen,

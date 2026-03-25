@@ -721,6 +721,55 @@ default_describe_content_type = get_config_item_or_set_default(
 
 config_dict["default_loras"] = default_loras = default_loras[:default_max_lora_number] + [[True, 'None', 1.0] for _ in range(default_max_lora_number - len(default_loras))]
 
+# --- Phase 5: Apply CLI overrides from args_manager ---
+if getattr(args_manager.args, 'default_prompt', None) is not None:
+    default_prompt = args_manager.args.default_prompt
+    config_dict['default_prompt'] = default_prompt
+
+if getattr(args_manager.args, 'default_negative', None) is not None:
+    default_prompt_negative = args_manager.args.default_negative
+    config_dict['default_prompt_negative'] = default_prompt_negative
+
+if getattr(args_manager.args, 'default_cfg', None) is not None:
+    default_cfg_scale = args_manager.args.default_cfg
+    config_dict['default_cfg_scale'] = default_cfg_scale
+
+if getattr(args_manager.args, 'default_sampler', None) is not None:
+    if args_manager.args.default_sampler in modules.flags.sampler_list:
+        default_sampler = args_manager.args.default_sampler
+        config_dict['default_sampler'] = default_sampler
+
+if getattr(args_manager.args, 'default_scheduler', None) is not None:
+    if args_manager.args.default_scheduler in modules.flags.scheduler_list:
+        default_scheduler = args_manager.args.default_scheduler
+        config_dict['default_scheduler'] = default_scheduler
+
+if getattr(args_manager.args, 'default_resolution', None) is not None:
+    if args_manager.args.default_resolution in available_aspect_ratios:
+        default_aspect_ratio = args_manager.args.default_resolution
+        config_dict['default_aspect_ratio'] = default_aspect_ratio
+
+if getattr(args_manager.args, 'image_number', None) is not None:
+    default_image_number = args_manager.args.image_number
+    config_dict['default_image_number'] = default_image_number
+
+if getattr(args_manager.args, 'default_steps', None) is not None:
+    default_overwrite_step = args_manager.args.default_steps
+    config_dict['default_overwrite_step'] = default_overwrite_step
+
+if getattr(args_manager.args, 'seed', None) is not None:
+    config_dict['default_seed'] = args_manager.args.seed
+
+if getattr(args_manager.args, 'default_loras', None) is not None:
+    import json as _json
+    try:
+        _cli_loras = _json.loads(args_manager.args.default_loras)
+        if isinstance(_cli_loras, list):
+            default_loras = _cli_loras[:default_max_lora_number] + [[True, 'None', 1.0] for _ in range(max(0, default_max_lora_number - len(_cli_loras)))]
+            config_dict['default_loras'] = default_loras
+    except (ValueError, TypeError):
+        print(f'Warning: --default-loras JSON parse failed, ignoring.')
+
 # mapping config to meta parameter
 possible_preset_keys = {
     "default_model": "base_model",
