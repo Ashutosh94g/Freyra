@@ -23,6 +23,10 @@ from modules.private_logger import get_current_html_path
 from modules.ui_gradio_extensions import reload_javascript
 from modules.auth import auth_enabled, check_auth
 from modules.util import is_json
+from modules.influencer_builder import (
+    BUILDER_CATEGORIES, CATEGORY_LABELS, NONE_OPTION,
+    load_dropdown_options, assemble_builder_prompt, get_effective_value,
+)
 
 def get_task(*args):
     args = list(args)
@@ -646,6 +650,51 @@ with shared.gradio_root:
                                                        show_progress="hidden").then(
                     lambda: None, js='()=>{refresh_style_localization();}')
 
+            with gr.Tab(label='Builder'):
+                builder_enabled = gr.Checkbox(label='Enable Influencer Builder', value=modules.config.default_builder_enabled)
+                builder_dropdowns = {}
+                builder_textboxes = {}
+                builder_ctrls = [builder_enabled]
+                for cat_key, wildcard_file in BUILDER_CATEGORIES:
+                    cat_label = CATEGORY_LABELS[cat_key]
+                    options = load_dropdown_options(wildcard_file)
+                    with gr.Accordion(label=cat_label, open=False):
+                        dd = gr.Dropdown(
+                            label=cat_label, choices=options,
+                            value=NONE_OPTION, interactive=True)
+                        tb = gr.Textbox(
+                            label=f'Custom {cat_label}',
+                            placeholder=f'Type custom {cat_label.lower()} to override dropdown...',
+                            lines=1, max_lines=1)
+                        builder_dropdowns[cat_key] = dd
+                        builder_textboxes[cat_key] = tb
+                        builder_ctrls += [dd, tb]
+                builder_preview = gr.Textbox(
+                    label='Builder Preview', interactive=False, lines=2,
+                    placeholder='Select options above to build a prompt...')
+
+                # Wire all dropdowns and textboxes to update the preview
+                all_builder_inputs = [builder_enabled]
+                for cat_key, _ in BUILDER_CATEGORIES:
+                    all_builder_inputs.append(builder_dropdowns[cat_key])
+                    all_builder_inputs.append(builder_textboxes[cat_key])
+
+                def update_builder_preview(enabled, *vals):
+                    if not enabled:
+                        return ''
+                    pairs = list(zip(vals[0::2], vals[1::2]))
+                    effective = {}
+                    for (cat_key, _wf), (dd_val, tb_val) in zip(BUILDER_CATEGORIES, pairs):
+                        effective[cat_key] = get_effective_value(dd_val, tb_val)
+                    return assemble_builder_prompt(**effective)
+
+                for component in all_builder_inputs:
+                    component.change(
+                        update_builder_preview,
+                        inputs=all_builder_inputs,
+                        outputs=builder_preview,
+                        queue=False, show_progress='hidden')
+
             with gr.Tab(label='Models'):
                 with gr.Group():
                     with gr.Row():
@@ -997,6 +1046,7 @@ with shared.gradio_root:
         if not args_manager.args.disable_metadata:
             ctrls += [save_metadata_to_images, metadata_scheme]
 
+        ctrls += builder_ctrls
         ctrls += ip_ctrls
         ctrls += [debugging_dino, dino_erode_or_dilate, debugging_enhance_masks_checkbox,
                   enhance_input_image, enhance_checkbox, enhance_uov_method, enhance_uov_processing_order,

@@ -106,6 +106,15 @@ class AsyncTask:
         self.metadata_scheme = MetadataScheme(
             args.pop()) if not args_manager.args.disable_metadata else MetadataScheme.FOOOCUS
 
+        # Influencer Builder controls
+        from modules.influencer_builder import BUILDER_CATEGORIES, NONE_OPTION, get_effective_value
+        self.builder_enabled = args.pop()
+        self.builder_values = {}
+        for cat_key, _wf in BUILDER_CATEGORIES:
+            dd_val = args.pop()
+            tb_val = args.pop()
+            self.builder_values[cat_key] = get_effective_value(dd_val, tb_val)
+
         self.cn_tasks = {x: [] for x in ip_list}
         for _ in range(modules.config.default_controlnet_image_count):
             cn_img = args.pop()
@@ -251,6 +260,14 @@ class AsyncTask:
         task.save_final_enhanced_image_only = params.get('save_final_enhanced_image_only', False)
         task.save_metadata_to_images = params.get('save_metadata_to_images', config.default_save_metadata_to_images)
         task.metadata_scheme = MetadataScheme(params.get('metadata_scheme', config.default_metadata_scheme))
+
+        # Influencer Builder (API support)
+        task.builder_enabled = params.get('builder_enabled', config.default_builder_enabled)
+        builder_input = params.get('builder', {})
+        from modules.influencer_builder import BUILDER_CATEGORIES
+        task.builder_values = {}
+        for cat_key, _wf in BUILDER_CATEGORIES:
+            task.builder_values[cat_key] = builder_input.get(cat_key, '')
 
         # ControlNet (empty for text-to-image API)
         task.cn_tasks = {x: [] for x in ip_list}
@@ -762,6 +779,15 @@ def worker():
         negative_prompts = remove_empty_str([safe_str(p) for p in negative_prompt.splitlines()], default='')
         prompt = prompts[0]
         negative_prompt = negative_prompts[0]
+
+        # Prepend Influencer Builder prompt if enabled
+        if getattr(async_task, 'builder_enabled', False) and hasattr(async_task, 'builder_values'):
+            from modules.influencer_builder import assemble_builder_prompt
+            builder_prompt = assemble_builder_prompt(**async_task.builder_values)
+            if builder_prompt:
+                prompt = f'{builder_prompt}, {prompt}' if prompt else builder_prompt
+                print(f'[Builder] Assembled prompt: {builder_prompt}')
+
         if prompt == '':
             # disable expansion when empty since it is not meaningful and influences image prompt
             use_expansion = False

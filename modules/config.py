@@ -668,6 +668,13 @@ metadata_created_by = get_config_item_or_set_default(
     expected_type=str
 )
 
+default_builder_enabled = get_config_item_or_set_default(
+    key='builder_enabled',
+    default_value=False,
+    validator=lambda x: isinstance(x, bool),
+    expected_type=bool
+)
+
 example_inpaint_prompts = [[x] for x in example_inpaint_prompts]
 example_enhance_detection_prompts = [[x] for x in example_enhance_detection_prompts]
 
@@ -801,6 +808,7 @@ possible_preset_keys = {
     "default_vae": "vae",
     # "default_inpaint_method": "inpaint_method", # disabled so inpaint mode doesn't refresh after every preset change
     "default_inpaint_engine_version": "inpaint_engine_version",
+    "builder_enabled": "builder_enabled",
 }
 
 REWRITE_PRESET = False

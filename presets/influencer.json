@@ -53,5 +53,6 @@
         "epiCPhoto.safetensors": "https://huggingface.co/AiWise/epiCPhoto-XL-LoRA-Derp2/resolve/main/epiCPhotoXL-LoRA-Derp2.safetensors",
         "DetailTweaker_xl.safetensors": "https://huggingface.co/imagepipeline/Detail-Tweaker-XL/resolve/main/239209ad-d39d-471f-805e-3af555ca5681.safetensors"
     },
-    "previous_default_models": []
+    "previous_default_models": [],
+    "builder_enabled": true
 }
