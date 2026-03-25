@@ -161,12 +161,13 @@ with shared.gradio_root:
                 progress_window = grh.Image(label='Preview', show_label=True, visible=False, height=768,
                                             elem_classes=['main_view'])
                 progress_gallery = gr.Gallery(label='Finished Images', show_label=True, object_fit='contain',
-                                              height=768, visible=False, elem_classes=['main_view', 'image_gallery'])
+                                              height=768, visible=False, elem_classes=['main_view', 'image_gallery'],
+                                              format='png', show_download_button=True)
             progress_html = gr.HTML(value=modules.html.make_progress_html(32, 'Progress 32%'), visible=False,
                                     elem_id='progress-bar', elem_classes='progress-bar')
             gallery = gr.Gallery(label='Gallery', show_label=False, object_fit='contain', visible=True, height=768,
                                  elem_classes=['resizable_area', 'main_view', 'final_gallery', 'image_gallery'],
-                                 elem_id='final_gallery')
+                                 elem_id='final_gallery', format='png', show_download_button=True)
             with gr.Row():
                 with gr.Column(scale=17):
                     prompt = gr.Textbox(show_label=False, placeholder="Type prompt here or paste parameters.", elem_id='positive_prompt',
@@ -1128,6 +1129,12 @@ shared.gradio_root.launch(
     server_port=args_manager.args.port,
     share=args_manager.args.share,
     auth=check_auth if (args_manager.args.share or args_manager.args.listen) and auth_enabled else None,
-    allowed_paths=[modules.config.path_outputs],
+    allowed_paths=[
+        modules.config.path_outputs,
+        modules.config.temp_path,
+        os.path.abspath('javascript'),
+        os.path.abspath('css'),
+        os.path.abspath('sdxl_styles'),
+    ],
     blocked_paths=[constants.AUTH_FILENAME]
 )
