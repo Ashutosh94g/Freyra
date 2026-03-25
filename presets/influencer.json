@@ -1,7 +1,7 @@
 {
     "default_model": "RealVisXL_V5.0_fp16.safetensors",
-    "default_refiner": "None",
-    "default_refiner_switch": 0.5,
+    "default_refiner": "realisticStockPhoto_v20.safetensors",
+    "default_refiner_switch": 0.35,
     "default_loras": [
         [
             true,
@@ -34,6 +34,7 @@
     "default_sampler": "dpmpp_2m_sde_gpu",
     "default_scheduler": "karras",
     "default_performance": "Quality",
+    "default_generation_steps": 60,
     "default_prompt": "",
     "default_prompt_negative": "unrealistic, saturated, big nose, painting, drawing, sketch, cartoon, anime, manga, render, CG, 3d, watermark, signature, label, deformed hands, bad anatomy, extra limbs, disfigured, mutated, poorly drawn face, bad proportions, gross proportions, malformed limbs, missing fingers, fused fingers, too many fingers, cloned face, ugly, blurry, out of focus, low quality, worst quality, jpeg artifacts, text, username",
     "default_styles": [
@@ -44,7 +45,8 @@
     "default_aspect_ratio": "896*1152",
     "default_overwrite_step": -1,
     "checkpoint_downloads": {
-        "RealVisXL_V5.0_fp16.safetensors": "https://huggingface.co/SG161222/RealVisXL_V5.0/resolve/main/RealVisXL_V5.0_fp16.safetensors"
+        "RealVisXL_V5.0_fp16.safetensors": "https://huggingface.co/SG161222/RealVisXL_V5.0/resolve/main/RealVisXL_V5.0_fp16.safetensors",
+        "realisticStockPhoto_v20.safetensors": "https://huggingface.co/lllyasviel/fav_models/resolve/main/fav/realisticStockPhoto_v20.safetensors"
     },
     "embeddings_downloads": {},
     "lora_downloads": {

@@ -36,6 +36,11 @@ class AsyncTask:
         self.steps = self.performance_selection.steps()
         self.original_steps = self.steps
 
+        self.generation_steps = int(args.pop())
+        if not Performance.has_restricted_features(self.performance_selection) and self.generation_steps > 0:
+            self.steps = self.generation_steps
+            self.original_steps = self.steps
+
         self.aspect_ratios_selection = args.pop()
         self.image_number = args.pop()
         self.output_format = args.pop()
@@ -190,6 +195,10 @@ class AsyncTask:
         task.performance_selection = Performance(params.get('performance', config.default_performance))
         task.steps = task.performance_selection.steps()
         task.original_steps = task.steps
+        task.generation_steps = int(params.get('generation_steps', config.default_generation_steps))
+        if not Performance.has_restricted_features(task.performance_selection) and task.generation_steps > 0:
+            task.steps = task.generation_steps
+            task.original_steps = task.steps
         task.aspect_ratios_selection = params.get('aspect_ratio', config.default_aspect_ratio.split('\u00d7')[0].strip() if '\u00d7' in str(config.default_aspect_ratio) else str(config.default_aspect_ratio))
         task.image_number = params.get('image_number', config.default_image_number)
         task.output_format = params.get('output_format', config.default_output_format)

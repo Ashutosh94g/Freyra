@@ -403,6 +403,12 @@ default_performance = get_config_item_or_set_default(
     validator=lambda x: x in Performance.values(),
     expected_type=str
 )
+default_generation_steps = get_config_item_or_set_default(
+    key='default_generation_steps',
+    default_value=60,
+    validator=lambda x: isinstance(x, int) and 10 <= x <= 200,
+    expected_type=int
+)
 default_image_prompt_checkbox = get_config_item_or_set_default(
     key='default_image_prompt_checkbox',
     default_value=False,
@@ -795,6 +801,7 @@ possible_preset_keys = {
     "default_overwrite_step": "steps",
     "default_overwrite_switch": "overwrite_switch",
     "default_performance": "performance",
+    "default_generation_steps": "generation_steps",
     "default_image_number": "image_number",
     "default_prompt": "prompt",
     "default_prompt_negative": "negative_prompt",
