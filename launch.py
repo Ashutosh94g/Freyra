@@ -1,6 +1,17 @@
 import os
 import ssl
 import sys
+import warnings
+
+# Suppress known harmless warnings that clutter Colab output
+warnings.filterwarnings('ignore', message='You have unused kwarg parameters.*', category=UserWarning)
+warnings.filterwarnings('ignore', message='Using the update method is deprecated.*', category=UserWarning)
+warnings.filterwarnings('ignore', message='.*please upgrade.*', category=UserWarning)
+warnings.filterwarnings('ignore', message='.*tie_word_embeddings.*')
+warnings.filterwarnings('ignore', category=SyntaxWarning)
+
+# Suppress noisy transformers logging (GPT-2 LOAD REPORT, UNEXPECTED keys)
+os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 
 print('[System ARGV] ' + str(sys.argv))
 
@@ -10,6 +21,7 @@ os.chdir(root)
 
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] = "0.0"
+os.environ["GRADIO_CHECK_UPDATE"] = "0"
 if "GRADIO_SERVER_PORT" not in os.environ:
     os.environ["GRADIO_SERVER_PORT"] = "7865"
 
