@@ -27,27 +27,33 @@ if not hasattr(_hf_hub, 'HfFolder'):
 # ── gradio_client JSON schema bug fix ───────────────────────────────
 # gradio_client's _json_schema_to_python_type crashes when a schema value
 # is a bool (e.g. additionalProperties: true) because it does `"const" in True`.
-# Patch get_type to guard against non-dict schema values.
+# We must patch the functions inside the module's own global namespace so that
+# recursive calls within the module also go through the patched versions.
 try:
     import gradio_client.utils as _gc_utils
+
     _original_get_type = _gc_utils.get_type
 
-    def _patched_get_type(schema):
+    def _safe_get_type(schema):
         if not isinstance(schema, dict):
             return "Any"
         return _original_get_type(schema)
 
-    _gc_utils.get_type = _patched_get_type
-
-    # Also guard _json_schema_to_python_type entry point
     _original_jstpt = _gc_utils._json_schema_to_python_type
 
-    def _patched_jstpt(schema, defs=None):
+    def _safe_jstpt(schema, defs=None):
         if not isinstance(schema, dict):
             return "Any"
         return _original_jstpt(schema, defs)
 
-    _gc_utils._json_schema_to_python_type = _patched_jstpt
+    # Replace at module level so external callers use patched version
+    _gc_utils.get_type = _safe_get_type
+    _gc_utils._json_schema_to_python_type = _safe_jstpt
+
+    # Also patch the module's own global dict so *internal* recursive calls
+    # (which resolve names through __globals__) see the patched functions.
+    _original_jstpt.__globals__['get_type'] = _safe_get_type
+    _original_jstpt.__globals__['_json_schema_to_python_type'] = _safe_jstpt
 except Exception:
     pass
 
