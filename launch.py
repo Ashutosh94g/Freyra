@@ -3,6 +3,27 @@ import ssl
 import sys
 import warnings
 
+# ── huggingface_hub compatibility shim ──────────────────────────────
+# HfFolder was removed in huggingface_hub >=0.27 but Gradio 4.44.1 still imports it.
+# Provide a lightweight stand-in so Gradio can load without forcing a hf_hub downgrade.
+import huggingface_hub as _hf_hub
+if not hasattr(_hf_hub, 'HfFolder'):
+    class _HfFolder:
+        @staticmethod
+        def get_token():
+            try:
+                from huggingface_hub import get_token
+                return get_token()
+            except Exception:
+                return None
+        @staticmethod
+        def save_token(token):
+            try:
+                _hf_hub.login(token=token)
+            except Exception:
+                pass
+    _hf_hub.HfFolder = _HfFolder
+
 # Suppress known harmless warnings that clutter Colab output
 warnings.filterwarnings('ignore', message='You have unused kwarg parameters.*', category=UserWarning)
 warnings.filterwarnings('ignore', message='Using the update method is deprecated.*', category=UserWarning)
