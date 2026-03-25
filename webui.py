@@ -82,12 +82,6 @@ def generate_clicked(task: worker.AsyncTask):
                     gr.update(visible=True, value=product)
                 finished = True
 
-                # delete Fooocus temp images, only keep gradio temp images
-                if args_manager.args.disable_image_log:
-                    for filepath in product:
-                        if isinstance(filepath, str) and os.path.exists(filepath):
-                            os.remove(filepath)
-
     execution_time = time.perf_counter() - execution_start_time
     print(f'Total time: {execution_time:.2f} seconds')
     return
