@@ -57,6 +57,11 @@ class AsyncTask:
         self.inpaint_additional_prompt = args.pop()
         self.inpaint_mask_image_upload = args.pop()
 
+        # Convert Gradio 4 ImageEditor output to legacy {image, mask} dict
+        from modules.gradio_hijack import convert_image_editor_to_legacy
+        self.inpaint_input_image = convert_image_editor_to_legacy(self.inpaint_input_image)
+        self.inpaint_mask_image_upload = convert_image_editor_to_legacy(self.inpaint_mask_image_upload)
+
         self.disable_preview = args.pop()
         self.disable_intermediate_results = args.pop()
         self.disable_seed_increment = args.pop()
