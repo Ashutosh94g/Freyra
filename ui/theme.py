@@ -47,8 +47,8 @@ def create_freyra_theme():
             c950="#141414",
             name="zinc",
         ),
-        font=gr.themes.GoogleFont("Inter"),
-        font_mono=gr.themes.GoogleFont("JetBrains Mono"),
+        font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif", "system-ui", "sans-serif"],
+        font_mono=[gr.themes.GoogleFont("JetBrains Mono"), "ui-monospace", "monospace"],
     ).set(
         body_background_fill="#0f0f0f",
         body_background_fill_dark="#0f0f0f",
