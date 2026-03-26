@@ -269,12 +269,21 @@ def generate_clicked(task: worker.AsyncTask):
 
 def _capture_history(task):
     """Capture generation results into server-side history after completion."""
+    # Fallback to the live worker state if Gradio state wasn't synced
+    results = getattr(task, 'results', []) or []
     prompt = getattr(task, 'prompt', '') or ''
     seed = getattr(task, 'seed', '?')
-    results = getattr(task, 'results', []) or []
+
+    if not results and worker.async_tasks:
+        latest = worker.async_tasks[-1]
+        results = getattr(latest, 'results', []) or []
+        prompt = getattr(latest, 'prompt', '') or prompt
+        seed = getattr(latest, 'seed', '?')
+
     image_paths = [r for r in results if isinstance(r, str)]
     if image_paths:
         history_add_entry(prompt=prompt, seed=seed, image_paths=image_paths)
+    
     return render_history_html()
 
 
@@ -965,6 +974,13 @@ def build_ui():
             fn=_capture_history,
             inputs=[current_task],
             outputs=[history_panel],
+        )
+
+        shared.gradio_root.load(
+            fn=render_history_html,
+            outputs=[history_panel],
+            queue=False,
+            show_progress='hidden',
         )
 
     return shared.gradio_root
