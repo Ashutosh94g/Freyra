@@ -21,7 +21,7 @@ import fooocus_version
 from modules.auth import auth_enabled, check_auth
 from modules.prompt_assembler import (
     load_options, load_options_no_none, NONE_OPTION, DIMENSION_FILES,
-    assemble_prompt, randomize_dimensions,
+    assemble_prompt, randomize_dimensions, get_smart_aspect_ratio,
 )
 from modules.shoot_types import (
     SHOOT_TYPES, SHOOT_TYPE_LABELS, QUALITY_MODES,
@@ -49,8 +49,11 @@ except Exception:
 
 def _build_task_params(
     shoot_type_label, quality_label, image_number, image_seed, seed_random,
-    skin_tone, hair_style, hair_color, outfit, pose, makeup, expression,
-    background, lighting, camera_angle, footwear, custom_prompt,
+    skin_tone, hair_style, hair_color,
+    outfit, outfit_custom, pose, pose_custom,
+    makeup, expression,
+    background, background_custom,
+    lighting, camera_angle, footwear, custom_prompt,
     face_image_1, face_image_2, face_image_3,
     pro_enabled, pro_base_model, pro_seed_override, pro_resolution,
 ):
@@ -63,16 +66,20 @@ def _build_task_params(
     if quality is None:
         quality = QUALITY_MODES["standard"]
 
+    effective_outfit = outfit_custom.strip() if outfit_custom and outfit_custom.strip() else outfit
+    effective_pose = pose_custom.strip() if pose_custom and pose_custom.strip() else pose
+    effective_bg = background_custom.strip() if background_custom and background_custom.strip() else background
+
     assembled = assemble_prompt(
         shoot_type_config=shoot,
         skin_tone=skin_tone,
         hair_style=hair_style,
         hair_color=hair_color,
-        outfit=outfit,
-        pose=pose,
+        outfit=effective_outfit,
+        pose=effective_pose,
         makeup=makeup,
         expression=expression,
-        background=background,
+        background=effective_bg,
         lighting=lighting,
         camera_angle=camera_angle,
         footwear=footwear,
@@ -99,7 +106,8 @@ def _build_task_params(
         while len(loras_config) < modules.config.default_max_lora_number:
             loras_config.append([True, 'None', 1.0])
 
-    aspect_ratio = assembled.get('aspect_ratio', '896*1152')
+    default_ar = assembled.get('aspect_ratio', '896*1152')
+    aspect_ratio = get_smart_aspect_ratio(camera_angle, default=default_ar)
     base_model = modules.config.default_base_model_name
 
     if pro_enabled:
@@ -139,6 +147,8 @@ def _build_task_params(
     cn_tasks = prepare_face_tasks(face_images)
     params['_cn_tasks'] = cn_tasks
     params['_has_face'] = len(face_images) > 0
+    params['_used_seed'] = seed
+    params['_camera_angle'] = camera_angle
 
     return params, seed
 
@@ -159,6 +169,7 @@ def _create_task_from_params(params):
 
 
 def generate_clicked(task: worker.AsyncTask):
+    """Run generation, yielding (progress_html, preview, progress_gallery, gallery, seed_text)."""
     import ldm_patched.modules.model_management as model_management
 
     with model_management.interrupt_processing_mutex:
@@ -175,6 +186,7 @@ def generate_clicked(task: worker.AsyncTask):
         gr.update(visible=True, value=None),
         gr.update(visible=False, value=None),
         gr.update(visible=False),
+        gr.update(),
     )
 
     worker.async_tasks.append(task)
@@ -192,6 +204,7 @@ def generate_clicked(task: worker.AsyncTask):
                     gr.update(visible=True, value=image) if image is not None else gr.update(),
                     gr.update(),
                     gr.update(visible=False),
+                    gr.update(),
                 )
             if flag == 'results':
                 yield (
@@ -199,13 +212,16 @@ def generate_clicked(task: worker.AsyncTask):
                     gr.update(visible=True),
                     gr.update(visible=True, value=product),
                     gr.update(visible=False),
+                    gr.update(),
                 )
             if flag == 'finish':
+                seed_val = str(task.seed) if hasattr(task, 'seed') else '?'
                 yield (
                     gr.update(visible=False),
                     gr.update(visible=False),
                     gr.update(visible=False),
                     gr.update(visible=True, value=product),
+                    gr.update(visible=True, value=f'Seed: {seed_val}'),
                 )
                 finished = True
 
@@ -561,6 +577,18 @@ def build_ui():
                         )
 
                         with gr.Row():
+                            seed_display = gr.Textbox(
+                                label='Last Seed',
+                                interactive=False, lines=1, max_lines=1,
+                                visible=False, scale=2,
+                            )
+                            reuse_seed_btn = gr.Button(
+                                value='Reuse Seed',
+                                variant='secondary', size='sm',
+                                visible=False, scale=1,
+                            )
+
+                        with gr.Row():
                             generate_button = gr.Button(
                                 value='Generate',
                                 variant='primary',
@@ -683,27 +711,32 @@ def build_ui():
         generation_inputs = [
             shoot_type, quality_mode, image_number, image_seed, seed_random,
             skin_tone, hair_style, hair_color,
-            outfit, pose, makeup, expression,
-            background, lighting, camera_angle, footwear, custom_prompt,
+            outfit, outfit_custom, pose, pose_custom,
+            makeup, expression,
+            background, background_custom,
+            lighting, camera_angle, footwear, custom_prompt,
             face_image_1, face_image_2, face_image_3,
             pro_enabled, pro_base_model, image_seed, pro_resolution,
         ]
 
         def prepare_generation(
             st, qm, img_num, img_seed, seed_rnd,
-            sk, hs, hc, ou, po, mk, ex, bg, lt, ca, fw, cp,
+            sk, hs, hc,
+            ou, ou_c, po, po_c,
+            mk, ex,
+            bg, bg_c,
+            lt, ca, fw, cp,
             fi1, fi2, fi3,
             pro_en, pro_bm, pro_seed, pro_res,
         ):
-            ou_val = ou
-            po_val = po
-
             params, seed = _build_task_params(
                 shoot_type_label=st, quality_label=qm,
                 image_number=img_num, image_seed=img_seed, seed_random=seed_rnd,
                 skin_tone=sk, hair_style=hs, hair_color=hc,
-                outfit=ou_val, pose=po_val, makeup=mk, expression=ex,
-                background=bg, lighting=lt, camera_angle=ca, footwear=fw,
+                outfit=ou, outfit_custom=ou_c, pose=po, pose_custom=po_c,
+                makeup=mk, expression=ex,
+                background=bg, background_custom=bg_c,
+                lighting=lt, camera_angle=ca, footwear=fw,
                 custom_prompt=cp,
                 face_image_1=fi1, face_image_2=fi2, face_image_3=fi3,
                 pro_enabled=pro_en, pro_base_model=pro_bm,
@@ -712,6 +745,22 @@ def build_ui():
 
             task = _create_task_from_params(params)
             return task
+
+        def _reuse_seed(seed_text):
+            """Extract numeric seed from display text and apply it."""
+            val = seed_text.replace('Seed:', '').strip() if seed_text else ''
+            try:
+                int(val)
+                return gr.update(value=False), gr.update(visible=True, value=val)
+            except (ValueError, TypeError):
+                return gr.update(), gr.update()
+
+        reuse_seed_btn.click(
+            fn=_reuse_seed,
+            inputs=[seed_display],
+            outputs=[seed_random, image_seed],
+            queue=False, show_progress='hidden',
+        )
 
         generate_button.click(
             lambda: (
@@ -726,15 +775,16 @@ def build_ui():
         ).then(
             fn=generate_clicked,
             inputs=current_task,
-            outputs=[progress_html, progress_window, progress_gallery, gallery],
+            outputs=[progress_html, progress_window, progress_gallery, gallery, seed_display],
         ).then(
             lambda: (
                 gr.update(visible=True),
                 gr.update(visible=False),
                 gr.update(visible=False),
+                gr.update(visible=True),
                 False,
             ),
-            outputs=[generate_button, stop_button, skip_button, state_is_generating],
+            outputs=[generate_button, stop_button, skip_button, reuse_seed_btn, state_is_generating],
         )
 
     return shared.gradio_root

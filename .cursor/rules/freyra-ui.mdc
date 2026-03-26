@@ -1,0 +1,47 @@
+---
+description: Freyra UI development standards for the Gradio interface
+globs: ui/**/*.py
+alwaysApply: false
+---
+
+# Freyra UI Standards
+
+## File Structure
+
+All UI code lives in `ui/` -- never edit the old `webui.py`.
+
+```
+ui/
+  app.py           -- Main Blocks layout, generation wiring
+  theme.py         -- Custom dark theme with amber accents
+  constants.py     -- UI constants
+  pages/
+    campaign.py    -- Campaign batch generation tab
+    gallery.py     -- Smart gallery with export
+  components/
+    vram_indicator.py -- Real-time VRAM bar
+```
+
+## Design Language
+
+- Dark mode primary, amber/gold (#c4852e) accents
+- Luxury creative aesthetic -- generous spacing, clean typography
+- Mobile-responsive (must work in Colab iframe)
+
+## Component Patterns
+
+Every creative dimension follows this pattern:
+
+```python
+with gr.Accordion('Dimension Name', open=False, elem_classes=['dimension-section']):
+    dropdown = gr.Dropdown(label='Select X', choices=options, value=NONE_OPTION)
+    custom = gr.Textbox(label='Custom X', placeholder='Or describe your own...')
+```
+
+## Rules
+
+- Use `gr.update()` for conditional visibility, never recreate components
+- Font families must be lists: `[gr.themes.GoogleFont("Inter"), "sans-serif"]`
+- No circular imports -- `ui/app.py` must not import `launch.py`
+- Wire events with `queue=False, show_progress='hidden'` for instant UI responses
+- Generation events use `.then()` chaining for sequential steps

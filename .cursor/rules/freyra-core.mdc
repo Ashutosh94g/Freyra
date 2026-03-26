@@ -1,0 +1,34 @@
+---
+description: Freyra core design philosophy -- the non-negotiable rules for every interaction
+alwaysApply: true
+---
+
+# Freyra Core Philosophy
+
+Freyra is an **opinionated virtual photo studio** for AI influencer images. It is NOT a general-purpose diffusion UI.
+
+## Non-Negotiable Principles
+
+1. **Never expose diffusion parameters to users.** No sampler dropdowns, no CFG sliders, no scheduler pickers, no LoRA weight controls. These are decided internally by shoot type configs in `modules/shoot_types.py`.
+
+2. **Target hardware: Colab free T4 (15GB VRAM).** Every feature must fit. If it doesn't run on T4 with fp8 UNet, it doesn't ship.
+
+3. **The user is a creative director, not a diffusion engineer.** They think in "pose + outfit + lighting", never in "CFG + sampler + LoRA weight".
+
+4. **12 creative dimensions are the UI contract:** Character/Face, Shoot Type, Pose, Outfit, Background, Lighting, Hair Style, Hair Color, Makeup, Expression, Camera Angle, Footwear, Skin Tone, Quality Mode.
+
+## Technical Defaults (internal, never user-facing)
+
+- Sampler: `dpmpp_2m_sde_gpu`
+- Scheduler: `karras`
+- Max 2 active LoRAs (T4 constraint)
+- Refiner: always `None`
+- Resolution cap: `896*1152` portrait, `1024*1024` square
+
+## Architecture Rules
+
+- New task creation uses `AsyncTask.from_dict()`, never positional args
+- Face consistency goes through `modules/face_engine.py`
+- Prompt construction goes through `modules/prompt_assembler.py`
+- Shoot type configs live in `modules/shoot_types.py`
+- No Fooocus branding anywhere -- this is "Freyra"

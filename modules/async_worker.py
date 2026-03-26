@@ -4,6 +4,7 @@ import gc
 from extras.inpaint_mask import generate_mask_from_image, SAMOptions
 from modules.patch import PatchSettings, patch_settings, patch_all
 import modules.config
+from modules.post_process import auto_enhance
 
 patch_all()
 
@@ -480,7 +481,16 @@ def worker():
 
     def save_and_log(async_task, height, imgs, task, use_expansion, width, loras, persist_image=True) -> list:
         img_paths = []
-        for x in imgs:
+        for idx, x in enumerate(imgs):
+            try:
+                from PIL import Image
+                pil_img = Image.fromarray(x) if not isinstance(x, Image.Image) else x
+                pil_img = auto_enhance(pil_img, sharpen=True, color_correct=True, film_grain=False)
+                import numpy as np
+                x = np.array(pil_img)
+                imgs[idx] = x
+            except Exception:
+                pass
             d = [('Prompt', 'prompt', task['log_positive_prompt']),
                  ('Negative Prompt', 'negative_prompt', task['log_negative_prompt']),
                  ('Fooocus V2 Expansion', 'prompt_expansion', task['expansion']),

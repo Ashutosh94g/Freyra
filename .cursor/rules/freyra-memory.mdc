@@ -1,0 +1,34 @@
+---
+description: T4 VRAM memory management rules for the diffusion backend
+globs: ldm_patched/**/*.py
+alwaysApply: false
+---
+
+# Freyra T4 Memory Rules
+
+## VRAM Budget (15GB total)
+
+| Component | VRAM |
+|-----------|------|
+| SDXL UNet fp8 | ~3.3 GB |
+| CLIP encoders fp16 | ~1.5 GB |
+| VAE fp16 | ~0.3 GB |
+| GPT-2 expansion | ~0.3 GB |
+| 2 LoRAs | ~0.5 GB |
+| Face adapter (IP-Adapter) | ~1-2 GB |
+| **Inference workspace** | **~6-8 GB** |
+
+## Hard Constraints
+
+- `minimum_inference_memory()` = 4 GB floor
+- Max 2 LoRAs simultaneously loaded
+- fp8 UNet (`--unet-in-fp8-e4m3fn`), fp16 VAE
+- Resolution cap: 896x1152 portrait, 1024x1024 square
+- Refiner always disabled (saves ~3GB)
+
+## Memory Cleanup Protocol
+
+- Call `aggressive_empty_cache()` (gc.collect + cuda.empty_cache + synchronize) between pipeline stages
+- Delete intermediate tensors (`del task['c'], task['uc']`) after sampling
+- Face analyzer runs on CPU, embeddings cached, adapter loaded only during conditioning
+- Unload face adapter before VAE decode

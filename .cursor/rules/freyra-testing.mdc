@@ -1,0 +1,28 @@
+---
+description: Testing and verification standards for Freyra changes
+globs: modules/*.py, ui/**/*.py
+alwaysApply: false
+---
+
+# Freyra Testing Standards
+
+## Before Pushing
+
+1. **No circular imports** -- `launch.py` imports `ui.app`, nothing in `ui/` imports `launch`
+2. **Aspect ratios** use `*` separator (e.g., `896*1152`), async_worker parses both `*` and `x`
+3. **Wildcard files** -- one entry per line, no trailing blanks, add new files to `wildcards/.gitignore` exceptions
+4. **Gradio theme** -- font families must be lists, not single objects
+
+## Colab T4 Verification
+
+- Always test on Colab free T4 before merging -- local GPU may mask OOM issues
+- Run full generation pipeline end-to-end (not just UI load)
+- Test with face reference images (IP-Adapter path)
+- Check VRAM stays under 14GB peak during generation
+
+## async_worker Compatibility
+
+When changing generation parameters:
+- Update `AsyncTask.from_dict()` if adding new params
+- Never change the positional args order in `AsyncTask.__init__` (legacy webui.py compat)
+- Test both the new UI path (`from_dict`) and the API path (`/api/v1/studio/generate`)

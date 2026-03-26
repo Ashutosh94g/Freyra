@@ -1,0 +1,41 @@
+---
+description: Freyra backend module standards for the generation pipeline
+globs: modules/*.py
+alwaysApply: false
+---
+
+# Freyra Backend Standards
+
+## Module Organization
+
+- New modules go in `modules/` with a docstring explaining purpose
+- Use `modules.config.path_*` for all file/model paths
+- Wildcard files go in `wildcards/` (add to `wildcards/.gitignore` exceptions)
+
+## Key Modules
+
+| Module | Responsibility |
+|--------|---------------|
+| `shoot_types.py` | Opinionated generation presets per shoot type |
+| `prompt_assembler.py` | Combine creative dimensions into optimized prompt |
+| `face_engine.py` | Unified face consistency API |
+| `character_profiles.py` | Persistent face identity storage |
+| `skin_detector.py` | Auto-detect skin tone from face reference |
+| `campaign.py` | Batch generation with character lock |
+| `export_presets.py` | Social media cropping and EXIF |
+| `post_process.py` | Auto color correction and sharpening |
+
+## Generation Flow
+
+```
+User dimensions -> prompt_assembler.assemble_prompt() -> params dict
+params dict -> AsyncTask.from_dict(params) -> worker thread
+Face images -> face_engine.prepare_face_tasks() -> task.cn_tasks
+```
+
+## Rules
+
+- LoRA configs come from shoot types, never user sliders
+- Aspect ratios use `*` separator (e.g., `896*1152`), the async_worker handles both `*` and `x` formats
+- Always call `model_management.aggressive_empty_cache()` between heavy pipeline stages
+- Skin tone and hair color are identity traits -- never randomized by Surprise Me

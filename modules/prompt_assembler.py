@@ -12,6 +12,32 @@ import modules.config
 
 NONE_OPTION = 'None'
 
+CAMERA_ANGLE_ASPECT_RATIOS = {
+    'close-up': '1024*1024',
+    'extreme close-up': '1024*1024',
+    'face only': '1024*1024',
+    'head and shoulders': '1024*1024',
+    'portrait': '896*1152',
+    'medium shot': '896*1152',
+    'waist up': '896*1152',
+    'three-quarter': '896*1152',
+    'full body': '832*1216',
+    'wide shot': '1152*896',
+    'wide': '1152*896',
+    'landscape': '1152*896',
+}
+
+
+def get_smart_aspect_ratio(camera_angle: str, default: str = '896*1152') -> str:
+    """Pick the best aspect ratio for a given camera angle description."""
+    if not camera_angle or camera_angle == NONE_OPTION:
+        return default
+    ca_lower = camera_angle.lower()
+    for keyword, ratio in CAMERA_ANGLE_ASPECT_RATIOS.items():
+        if keyword in ca_lower:
+            return ratio
+    return default
+
 DIMENSION_FILES = {
     'skin_tone': 'skin_tones.txt',
     'hair_style': 'influencer_hair.txt',
