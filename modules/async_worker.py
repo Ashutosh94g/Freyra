@@ -1268,7 +1268,8 @@ def worker():
         denoising_strength = 1.0
         tiled = False
 
-        width, height = async_task.aspect_ratios_selection.replace('×', ' ').split(' ')[:2]
+        _ar = async_task.aspect_ratios_selection.replace('×', '*').split('*')[:2]
+        width, height = _ar[0].strip(), _ar[1].strip() if len(_ar) > 1 else _ar[0].strip()
         width, height = int(width), int(height)
 
         skip_prompt_processing = False

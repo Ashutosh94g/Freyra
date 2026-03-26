@@ -20,7 +20,8 @@ import fooocus_version
 
 from modules.auth import auth_enabled, check_auth
 from modules.prompt_assembler import (
-    load_options, NONE_OPTION, DIMENSION_FILES, assemble_prompt,
+    load_options, load_options_no_none, NONE_OPTION, DIMENSION_FILES,
+    assemble_prompt, randomize_dimensions,
 )
 from modules.shoot_types import (
     SHOOT_TYPES, SHOOT_TYPE_LABELS, QUALITY_MODES,
@@ -253,13 +254,19 @@ def build_ui():
                     elem_classes=['quality-radio'],
                 )
 
-                # Image Count
+                # Image Count + Randomize
                 image_number = gr.Slider(
                     label='Number of Images',
                     minimum=1,
                     maximum=IMAGE_COUNT_MAX,
                     step=1,
                     value=IMAGE_COUNT_DEFAULT,
+                )
+
+                randomize_btn = gr.Button(
+                    value='Surprise Me',
+                    variant='secondary',
+                    size='sm',
                 )
 
                 # Character / Face
@@ -550,6 +557,36 @@ def build_ui():
 
                     with gr.Tab(label='Gallery & Export'):
                         gallery_ui = build_gallery_tab()
+
+        # ── Wire: Surprise Me button ──
+        randomize_outputs = [
+            shoot_type, skin_tone, hair_style, hair_color,
+            outfit, pose, makeup, expression,
+            background, lighting, camera_angle, footwear,
+        ]
+
+        def on_randomize():
+            dims = randomize_dimensions()
+            rand_shoot = random.choice(SHOOT_TYPE_LABELS)
+            return [
+                rand_shoot,
+                dims.get('skin_tone', NONE_OPTION),
+                dims.get('hair_style', NONE_OPTION),
+                dims.get('hair_color', NONE_OPTION),
+                dims.get('outfit', NONE_OPTION),
+                dims.get('pose', NONE_OPTION),
+                dims.get('makeup', NONE_OPTION),
+                dims.get('expression', NONE_OPTION),
+                dims.get('background', NONE_OPTION),
+                dims.get('lighting', NONE_OPTION),
+                dims.get('camera_angle', NONE_OPTION),
+                dims.get('footwear', NONE_OPTION),
+            ]
+
+        randomize_btn.click(
+            on_randomize, outputs=randomize_outputs,
+            queue=False, show_progress='hidden',
+        )
 
         # ── Wire: prompt preview updates ──
         all_dimension_inputs = [
