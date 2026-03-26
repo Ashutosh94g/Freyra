@@ -35,6 +35,10 @@ from ui.constants import (
     FREYRA_TITLE, FREYRA_SUBTITLE, IMAGE_COUNT_MAX, IMAGE_COUNT_DEFAULT,
 )
 from ui.components.vram_indicator import create_vram_indicator
+from modules.character_profiles import (
+    list_profile_names, save_profile, load_profile, delete_profile,
+)
+from modules.face_engine import prepare_face_tasks, auto_select_method
 
 try:
     from modules.ui_gradio_extensions import reload_javascript
@@ -131,14 +135,10 @@ def _build_task_params(
         'builder_enabled': False,
     }
 
-    cn_tasks = {x: [] for x in flags.ip_list}
-    face_images = [face_image_1, face_image_2, face_image_3]
-    for fi in face_images:
-        if fi is not None:
-            cn_tasks[flags.cn_ip_face].append([fi, 0.75, 0.9])
-
+    face_images = [fi for fi in [face_image_1, face_image_2, face_image_3] if fi is not None]
+    cn_tasks = prepare_face_tasks(face_images)
     params['_cn_tasks'] = cn_tasks
-    params['_has_face'] = any(fi is not None for fi in face_images)
+    params['_has_face'] = len(face_images) > 0
 
     return params, seed
 
@@ -266,7 +266,14 @@ def build_ui():
 
                 # Character / Face
                 with gr.Accordion('Character / Face', open=True, elem_classes=['dimension-section']):
-                    gr.Markdown('Upload 1-3 reference photos for face consistency')
+                    saved_profiles = list_profile_names()
+                    character_select = gr.Dropdown(
+                        label='Saved Characters',
+                        choices=saved_profiles,
+                        value='None',
+                        interactive=True,
+                    )
+                    gr.Markdown('Or upload 1-3 reference photos:')
                     with gr.Row():
                         face_image_1 = gr.Image(
                             label='Face 1', type='numpy',
@@ -283,6 +290,60 @@ def build_ui():
                             height=120, sources=['upload'],
                             elem_classes=['face-upload-area'],
                         )
+                    with gr.Row():
+                        save_char_name = gr.Textbox(
+                            label='Character Name', placeholder='Name this character...',
+                            lines=1, max_lines=1, scale=3,
+                        )
+                        save_char_btn = gr.Button('Save Character', variant='secondary', scale=1, size='sm')
+                        delete_char_btn = gr.Button('Delete', variant='stop', scale=1, size='sm')
+
+                    def on_save_character(name, img1, img2, img3):
+                        if not name or not name.strip():
+                            return gr.update()
+                        images = [i for i in [img1, img2, img3] if i is not None]
+                        if not images:
+                            return gr.update()
+                        save_profile(name.strip(), images)
+                        new_profiles = list_profile_names()
+                        return gr.update(choices=new_profiles, value=name.strip())
+
+                    save_char_btn.click(
+                        on_save_character,
+                        inputs=[save_char_name, face_image_1, face_image_2, face_image_3],
+                        outputs=[character_select],
+                        queue=False, show_progress='hidden',
+                    )
+
+                    def on_delete_character(name):
+                        if not name or name == 'None':
+                            return gr.update()
+                        delete_profile(name)
+                        new_profiles = list_profile_names()
+                        return gr.update(choices=new_profiles, value='None')
+
+                    delete_char_btn.click(
+                        on_delete_character,
+                        inputs=[character_select],
+                        outputs=[character_select],
+                        queue=False, show_progress='hidden',
+                    )
+
+                    def on_load_character(name):
+                        images = load_profile(name)
+                        if images is None:
+                            return [None, None, None]
+                        result = [None, None, None]
+                        for i, img in enumerate(images[:3]):
+                            result[i] = img
+                        return result
+
+                    character_select.change(
+                        on_load_character,
+                        inputs=[character_select],
+                        outputs=[face_image_1, face_image_2, face_image_3],
+                        queue=False, show_progress='hidden',
+                    )
 
                 # Skin Tone
                 skin_tone_options = load_options('skin_tones.txt')
