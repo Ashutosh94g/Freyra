@@ -1435,8 +1435,8 @@ def worker():
             progressbar(async_task, current_progress, f'Preparing task {current_task_id + 1}/{async_task.image_number} ...')
             execution_start_time = time.perf_counter()
 
-            # Flush VRAM before each image to prevent accumulation across a batch
-            ldm_patched.modules.model_management.soft_empty_cache()
+            # Aggressive VRAM flush before each image (critical for T4 15GB budget)
+            ldm_patched.modules.model_management.aggressive_empty_cache()
 
             try:
                 imgs, img_paths, current_progress = process_task(all_steps, async_task, callback, controlnet_canny_path,
@@ -1468,9 +1468,8 @@ def worker():
                     print('User stopped')
                     break
 
-            del task['c'], task['uc']  # Save memory
-            ldm_patched.modules.model_management.soft_empty_cache()
-            gc.collect()
+            del task['c'], task['uc']
+            ldm_patched.modules.model_management.aggressive_empty_cache()
             execution_time = time.perf_counter() - execution_start_time
             print(f'Generating and saving time: {execution_time:.2f} seconds')
 

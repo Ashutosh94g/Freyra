@@ -34,6 +34,7 @@ from ui.theme import create_freyra_theme, FREYRA_CSS
 from ui.constants import (
     FREYRA_TITLE, FREYRA_SUBTITLE, IMAGE_COUNT_MAX, IMAGE_COUNT_DEFAULT,
 )
+from ui.components.vram_indicator import create_vram_indicator
 
 try:
     from modules.ui_gradio_extensions import reload_javascript
@@ -427,6 +428,9 @@ def build_ui():
                         refresh_files_clicked, outputs=[pro_base_model],
                         queue=False, show_progress='hidden',
                     )
+
+                # VRAM Monitor
+                create_vram_indicator()
 
             # ── RIGHT COLUMN: Output ──
             with gr.Column(scale=2):

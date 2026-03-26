@@ -342,8 +342,9 @@ class LoadedModel:
         return self.model is other.model
 
 def minimum_inference_memory():
-    # Raised from 3 GB to 3.5 GB for T4 (15 GB VRAM) stability with fp8 UNet + 4 LoRAs at 896x1152.
-    return (3.5 * 1024 * 1024 * 1024)
+    # Freyra v3: 4 GB floor for T4 stability with face consistency adapters.
+    # fp8 UNet (~3.3GB) + CLIP (~1.5GB) + face adapter overhead need breathing room.
+    return (4 * 1024 * 1024 * 1024)
 
 def unload_model_clones(model):
     to_unload = []
@@ -767,9 +768,41 @@ def soft_empty_cache(force=False):
     elif is_intel_xpu():
         torch.xpu.empty_cache()
     elif torch.cuda.is_available():
-        if force or is_nvidia(): #This seems to make things worse on ROCm so I only do it for cuda
+        if force or is_nvidia():
             torch.cuda.empty_cache()
             torch.cuda.ipc_collect()
+
+
+def aggressive_empty_cache():
+    """Aggressive memory cleanup for T4 environments between pipeline stages."""
+    import gc
+    gc.collect()
+    soft_empty_cache(force=True)
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+
+
+def get_vram_info() -> dict:
+    """Return VRAM usage breakdown for UI display."""
+    if not torch.cuda.is_available():
+        return {'total': 0, 'used': 0, 'free': 0, 'percent': 0}
+    dev = get_torch_device()
+    total = get_total_memory(dev)
+    free = get_free_memory(dev)
+    used = total - free
+    pct = (used / total * 100) if total > 0 else 0
+    return {
+        'total': total,
+        'used': used,
+        'free': free,
+        'percent': round(pct, 1),
+        'total_gb': round(total / (1024**3), 1),
+        'used_gb': round(used / (1024**3), 1),
+        'free_gb': round(free / (1024**3), 1),
+    }
+
 
 def unload_all_models():
     free_memory(1e30, get_torch_device())
