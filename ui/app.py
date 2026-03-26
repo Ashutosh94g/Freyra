@@ -8,7 +8,6 @@ import gradio as gr
 import random
 import os
 import time
-import copy
 
 import shared
 import modules.config
@@ -17,11 +16,8 @@ import modules.async_worker as worker
 import modules.constants as constants
 import modules.flags as flags
 import args_manager
-import launch
 import fooocus_version
 
-from modules.sdxl_styles import legal_style_names
-from modules.private_logger import get_current_html_path
 from modules.auth import auth_enabled, check_auth
 from modules.prompt_assembler import (
     load_options, NONE_OPTION, DIMENSION_FILES, assemble_prompt,
