@@ -159,9 +159,29 @@ def generate_empty_latent(width=1024, height=1024, batch_size=1):
 @torch.inference_mode()
 def decode_vae(vae, latent_image, tiled=False):
     if tiled:
-        return opVAEDecodeTiled.decode(samples=latent_image, vae=vae, tile_size=512)[0]
+        out = opVAEDecodeTiled.decode(samples=latent_image, vae=vae, tile_size=512)[0]
     else:
-        return opVAEDecode.decode(samples=latent_image, vae=vae)[0]
+        out = opVAEDecode.decode(samples=latent_image, vae=vae)[0]
+
+    if torch.isnan(out).any() or torch.isinf(out).any():
+        print("[Freyra VAE] fp16 NaNs detected! Temporarily elevating VAE to float32...")
+        
+        old_dtype = getattr(vae, 'vae_dtype', torch.float16)
+        vae.vae_dtype = torch.float32
+        vae.first_stage_model.to(torch.float32)
+        
+        import ldm_patched.modules.model_management as model_management
+        model_management.soft_empty_cache()
+        
+        if tiled:
+            out = opVAEDecodeTiled.decode(samples=latent_image, vae=vae, tile_size=512)[0]
+        else:
+            out = opVAEDecode.decode(samples=latent_image, vae=vae)[0]
+        
+        vae.vae_dtype = old_dtype
+        vae.first_stage_model.to(old_dtype)
+
+    return out
 
 
 @torch.no_grad()
