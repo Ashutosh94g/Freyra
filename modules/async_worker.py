@@ -4,7 +4,6 @@ import gc
 from extras.inpaint_mask import generate_mask_from_image, SAMOptions
 from modules.patch import PatchSettings, patch_settings, patch_all
 import modules.config
-from modules.post_process import auto_enhance
 
 patch_all()
 
@@ -483,10 +482,11 @@ def worker():
         img_paths = []
         for idx, x in enumerate(imgs):
             try:
+                from modules.post_process import auto_enhance
                 from PIL import Image
+                import numpy as np
                 pil_img = Image.fromarray(x) if not isinstance(x, Image.Image) else x
                 pil_img = auto_enhance(pil_img, sharpen=True, color_correct=True, film_grain=False)
-                import numpy as np
                 x = np.array(pil_img)
                 imgs[idx] = x
             except Exception:

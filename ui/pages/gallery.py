@@ -16,49 +16,63 @@ def _format_key_from_label(label: str) -> str | None:
     return None
 
 
-def _do_export(gallery_selection, export_label):
-    """Export selected gallery image with platform cropping + EXIF."""
-    if gallery_selection is None:
-        return 'No image selected. Click an image in the gallery first.', None
+def _do_export(gallery_data, export_label):
+    """Export the first gallery image with platform cropping + EXIF."""
+    if gallery_data is None or len(gallery_data) == 0:
+        return 'No images in gallery. Generate images first.'
 
     format_key = _format_key_from_label(export_label)
     if format_key is None:
-        return f'Unknown format: {export_label}', None
+        return f'Unknown format: {export_label}'
 
     img_path = None
-    if isinstance(gallery_selection, str):
-        img_path = gallery_selection
-    elif isinstance(gallery_selection, dict):
-        img_path = gallery_selection.get('name') or gallery_selection.get('path')
-    elif isinstance(gallery_selection, (list, tuple)) and len(gallery_selection) > 0:
-        first = gallery_selection[0]
-        if isinstance(first, str):
-            img_path = first
-        elif isinstance(first, dict):
-            img_path = first.get('name') or first.get('path')
+    first = gallery_data[0]
+    if isinstance(first, str):
+        img_path = first
+    elif isinstance(first, dict):
+        img_path = first.get('name') or first.get('path') or first.get('image', {}).get('path')
+    elif isinstance(first, (list, tuple)) and len(first) > 0:
+        img_path = first[0] if isinstance(first[0], str) else None
 
     if img_path is None or not os.path.isfile(str(img_path)):
-        return 'Could not locate the selected image file.', None
+        return 'Could not locate the image file. Try generating images first.'
 
-    from PIL import Image
-    src_img = Image.open(img_path)
+    try:
+        from PIL import Image
+        src_img = Image.open(img_path)
 
-    export_dir = os.path.join(modules.config.path_outputs, 'exports')
-    os.makedirs(export_dir, exist_ok=True)
+        export_dir = os.path.join(modules.config.path_outputs, 'exports')
+        os.makedirs(export_dir, exist_ok=True)
 
-    base = os.path.splitext(os.path.basename(img_path))[0]
-    out_name = f'{base}_{format_key}.jpg'
-    out_path = os.path.join(export_dir, out_name)
+        base = os.path.splitext(os.path.basename(img_path))[0]
+        out_name = f'{base}_{format_key}.jpg'
+        out_path = os.path.join(export_dir, out_name)
 
-    exported = export_with_exif(src_img, format_key, output_path=out_path)
-    if not os.path.isfile(out_path):
-        exported.save(out_path, quality=95)
+        exported = export_with_exif(src_img, format_key, output_path=out_path)
+        if not os.path.isfile(out_path):
+            exported.save(out_path, quality=95)
 
-    fmt = EXPORT_FORMATS[format_key]
-    return (
-        f'Exported {fmt["label"]} ({fmt["width"]}x{fmt["height"]}) to exports/{out_name}',
-        out_path,
-    )
+        fmt = EXPORT_FORMATS[format_key]
+        return f'Exported {fmt["label"]} ({fmt["width"]}x{fmt["height"]}) -> exports/{out_name}'
+    except Exception as e:
+        return f'Export failed: {e}'
+
+
+def _compare(gallery_data):
+    """Load first two images for side-by-side comparison."""
+    if gallery_data is None or len(gallery_data) < 2:
+        return None, None
+
+    def _extract_path(item):
+        if isinstance(item, str):
+            return item
+        if isinstance(item, dict):
+            return item.get('name') or item.get('path') or item.get('image', {}).get('path')
+        if isinstance(item, (list, tuple)) and len(item) > 0:
+            return item[0] if isinstance(item[0], str) else None
+        return None
+
+    return _extract_path(gallery_data[0]), _extract_path(gallery_data[1])
 
 
 def build_gallery_tab():
@@ -87,7 +101,6 @@ def build_gallery_tab():
             )
             export_btn = gr.Button('Export Selected', variant='primary', size='sm')
             export_status = gr.Textbox(label='Export Status', interactive=False, lines=1)
-            export_download = gr.File(label='Download', visible=False)
 
         with gr.Column(scale=1):
             gr.Markdown('**Compare**')
@@ -99,21 +112,9 @@ def build_gallery_tab():
     export_btn.click(
         fn=_do_export,
         inputs=[gallery_view, export_format],
-        outputs=[export_status, export_download],
-    ).then(
-        fn=lambda path: gr.update(visible=path is not None, value=path),
-        inputs=[export_download],
-        outputs=[export_download],
+        outputs=[export_status],
+        queue=False, show_progress='hidden',
     )
-
-    def _compare(gallery_data):
-        if gallery_data is None or len(gallery_data) < 2:
-            return None, None
-        first = gallery_data[0]
-        second = gallery_data[1]
-        path_a = first if isinstance(first, str) else (first.get('name') if isinstance(first, dict) else None)
-        path_b = second if isinstance(second, str) else (second.get('name') if isinstance(second, dict) else None)
-        return path_a, path_b
 
     compare_btn.click(
         fn=_compare,
@@ -127,7 +128,6 @@ def build_gallery_tab():
         'export_format': export_format,
         'export_btn': export_btn,
         'export_status': export_status,
-        'export_download': export_download,
         'compare_btn': compare_btn,
         'compare_img_1': compare_img_1,
         'compare_img_2': compare_img_2,

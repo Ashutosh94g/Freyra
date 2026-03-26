@@ -4,12 +4,10 @@ import random
 import time
 import gradio as gr
 
-from modules.campaign import create_campaign, update_campaign_status, CAMPAIGNS_DIR
+from modules.campaign import create_campaign, update_campaign_status
 from modules.character_profiles import list_profile_names, load_profile
 from modules.shoot_types import SHOOT_TYPE_LABELS, get_shoot_type, SHOOT_TYPES, QUALITY_MODES
-from modules.prompt_assembler import (
-    load_options_no_none, NONE_OPTION, assemble_prompt,
-)
+from modules.prompt_assembler import load_options_no_none, assemble_prompt
 from modules.face_engine import prepare_face_tasks
 import modules.config
 import modules.async_worker as worker
@@ -63,60 +61,70 @@ def _generate_campaign(
     for i, var in enumerate(variations):
         yield f'Generating image {i + 1}/{count}...', all_results
 
-        assembled = assemble_prompt(
-            shoot_type_config=shoot,
-            pose=var.get('pose', ''),
-            background=var.get('background', ''),
-            outfit=var.get('outfit', ''),
-        )
+        try:
+            assembled = assemble_prompt(
+                shoot_type_config=shoot,
+                pose=var.get('pose', ''),
+                background=var.get('background', ''),
+                outfit=var.get('outfit', ''),
+            )
 
-        loras_config = []
-        for lora_name, lora_weight in assembled.get('loras', [])[:2]:
-            loras_config.append([True, lora_name, lora_weight])
-        while len(loras_config) < modules.config.default_max_lora_number:
-            loras_config.append([True, 'None', 1.0])
+            loras_config = []
+            for lora_name, lora_weight in assembled.get('loras', [])[:2]:
+                loras_config.append([True, lora_name, lora_weight])
+            while len(loras_config) < modules.config.default_max_lora_number:
+                loras_config.append([True, 'None', 1.0])
 
-        params = {
-            'prompt': assembled['prompt'],
-            'negative_prompt': assembled['negative_prompt'],
-            'styles': assembled.get('styles', ['Fooocus V2', 'SAI Photographic', 'Fooocus Negative']),
-            'performance': quality['performance'],
-            'generation_steps': quality['steps'],
-            'aspect_ratio': assembled.get('aspect_ratio', '896*1152'),
-            'image_number': 1,
-            'output_format': 'png',
-            'seed': random.randint(0, 2**31),
-            'sharpness': assembled.get('sharpness', 2.0),
-            'cfg_scale': assembled.get('cfg_scale', 4.5),
-            'base_model': modules.config.default_base_model_name,
-            'refiner_model': 'None',
-            'loras': loras_config,
-            'sampler': 'dpmpp_2m_sde_gpu',
-            'scheduler': 'karras',
-            'disable_preview': True,
-            'disable_intermediate_results': True,
-        }
+            params = {
+                'prompt': assembled['prompt'],
+                'negative_prompt': assembled['negative_prompt'],
+                'styles': assembled.get('styles', ['Fooocus V2', 'SAI Photographic', 'Fooocus Negative']),
+                'performance': quality['performance'],
+                'generation_steps': quality['steps'],
+                'aspect_ratio': assembled.get('aspect_ratio', '896*1152'),
+                'image_number': 1,
+                'output_format': 'png',
+                'seed': random.randint(0, 2**31),
+                'sharpness': assembled.get('sharpness', 2.0),
+                'cfg_scale': assembled.get('cfg_scale', 4.5),
+                'base_model': modules.config.default_base_model_name,
+                'refiner_model': 'None',
+                'loras': loras_config,
+                'sampler': 'dpmpp_2m_sde_gpu',
+                'scheduler': 'karras',
+                'disable_preview': True,
+                'disable_intermediate_results': True,
+            }
 
-        cn_tasks = prepare_face_tasks(face_images)
-        params['_cn_tasks'] = cn_tasks
-        params['_has_face'] = True
+            cn_tasks = prepare_face_tasks(face_images)
+            params['_cn_tasks'] = cn_tasks
+            params['_has_face'] = True
 
-        task = worker.AsyncTask.from_dict(params)
-        if cn_tasks:
-            task.cn_tasks = cn_tasks
-        task.input_image_checkbox = True
-        task.current_tab = 'ip'
+            task = worker.AsyncTask.from_dict(params)
+            if cn_tasks:
+                task.cn_tasks = cn_tasks
+            task.input_image_checkbox = True
+            task.current_tab = 'ip'
 
-        worker.async_tasks.append(task)
+            worker.async_tasks.append(task)
 
-        while True:
-            time.sleep(0.1)
-            if len(task.yields) > 0:
-                flag, product = task.yields.pop(0)
-                if flag == 'finish':
-                    if isinstance(product, list):
-                        all_results.extend(product)
-                    break
+            timeout = 300
+            start = time.time()
+            while time.time() - start < timeout:
+                time.sleep(0.2)
+                if len(task.yields) > 0:
+                    flag, product = task.yields.pop(0)
+                    if flag == 'finish':
+                        if isinstance(product, list):
+                            all_results.extend(product)
+                        break
+            else:
+                yield f'Image {i + 1}/{count} timed out. Continuing...', all_results
+                continue
+
+        except Exception as e:
+            yield f'Error on image {i + 1}/{count}: {e}', all_results
+            continue
 
         yield f'Completed image {i + 1}/{count}', all_results
 
