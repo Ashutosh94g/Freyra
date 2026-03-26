@@ -1,9 +1,13 @@
-# Freyra — Project Vision & Knowledgebase
+# Freyra v3.0 — The Opinionated AI Photo Studio
 
 ## What Is This
 
-**Freyra** is a fork of [Fooocus](https://github.com/lllyasviel/Fooocus) (v2.5.5, GPL-3.0) tuned exclusively
-for generating photorealistic **fashion / fitness female influencer AI model images**.
+**Freyra** is a fork of [Fooocus](https://github.com/lllyasviel/Fooocus) (v2.5.5, GPL-3.0) transformed into
+an **opinionated virtual photo studio** for generating photorealistic **female influencer AI model images**.
+
+Unlike generic AI image tools that expose dozens of technical knobs, Freyra hides diffusion complexity
+and exposes only what a creative director cares about: character identity, shoot type, pose, outfit,
+background, lighting, hair, makeup, expression, camera angle, and footwear.
 
 > Original Fooocus was effectively abandoned August 2024 (226 open issues, 59 open PRs, no maintainer activity).
 > We fork it, fix it, and narrow its focus.

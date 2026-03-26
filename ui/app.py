@@ -39,6 +39,8 @@ from modules.character_profiles import (
     list_profile_names, save_profile, load_profile, delete_profile,
 )
 from modules.face_engine import prepare_face_tasks, auto_select_method
+from ui.pages.campaign import build_campaign_tab
+from ui.pages.gallery import build_gallery_tab
 
 try:
     from modules.ui_gradio_extensions import reload_javascript
@@ -495,56 +497,63 @@ def build_ui():
 
             # ── RIGHT COLUMN: Output ──
             with gr.Column(scale=2):
-                with gr.Row():
-                    progress_window = gr.Image(
-                        label='Preview', show_label=True,
-                        visible=False, height=512,
-                    )
-                    progress_gallery = gr.Gallery(
-                        label='Generating...', show_label=True,
-                        object_fit='contain', height=512,
-                        visible=False, format='png',
-                    )
+                with gr.Tabs():
+                    with gr.Tab(label='Studio'):
+                        with gr.Row():
+                            progress_window = gr.Image(
+                                label='Preview', show_label=True,
+                                visible=False, height=512,
+                            )
+                            progress_gallery = gr.Gallery(
+                                label='Generating...', show_label=True,
+                                object_fit='contain', height=512,
+                                visible=False, format='png',
+                            )
 
-                progress_html = gr.HTML(
-                    value=modules.html.make_progress_html(0, ''),
-                    visible=False, elem_classes='progress-bar',
-                )
+                        progress_html = gr.HTML(
+                            value=modules.html.make_progress_html(0, ''),
+                            visible=False, elem_classes='progress-bar',
+                        )
 
-                gallery = gr.Gallery(
-                    label='Generated Images', show_label=False,
-                    object_fit='contain', visible=True, height=600,
-                    format='png', show_download_button=True,
-                    elem_classes=['freyra-gallery'],
-                )
+                        gallery = gr.Gallery(
+                            label='Generated Images', show_label=False,
+                            object_fit='contain', visible=True, height=500,
+                            format='png', show_download_button=True,
+                            elem_classes=['freyra-gallery'],
+                        )
 
-                # Prompt Preview (read-only, shows assembled prompt)
-                prompt_preview = gr.Textbox(
-                    label='Assembled Prompt (read-only)',
-                    interactive=False, lines=3, max_lines=5,
-                    visible=True,
-                )
+                        prompt_preview = gr.Textbox(
+                            label='Assembled Prompt (read-only)',
+                            interactive=False, lines=2, max_lines=4,
+                            visible=True,
+                        )
 
-                with gr.Row():
-                    generate_button = gr.Button(
-                        value='Generate',
-                        variant='primary',
-                        elem_classes=['freyra-generate-btn'],
-                        scale=3,
-                    )
-                    stop_button = gr.Button(
-                        value='Stop',
-                        variant='stop',
-                        visible=False,
-                        elem_classes=['freyra-stop-btn'],
-                        scale=1,
-                    )
-                    skip_button = gr.Button(
-                        value='Skip',
-                        variant='secondary',
-                        visible=False,
-                        scale=1,
-                    )
+                        with gr.Row():
+                            generate_button = gr.Button(
+                                value='Generate',
+                                variant='primary',
+                                elem_classes=['freyra-generate-btn'],
+                                scale=3,
+                            )
+                            stop_button = gr.Button(
+                                value='Stop',
+                                variant='stop',
+                                visible=False,
+                                elem_classes=['freyra-stop-btn'],
+                                scale=1,
+                            )
+                            skip_button = gr.Button(
+                                value='Skip',
+                                variant='secondary',
+                                visible=False,
+                                scale=1,
+                            )
+
+                    with gr.Tab(label='Campaign'):
+                        campaign_ui = build_campaign_tab()
+
+                    with gr.Tab(label='Gallery & Export'):
+                        gallery_ui = build_gallery_tab()
 
         # ── Wire: prompt preview updates ──
         all_dimension_inputs = [
