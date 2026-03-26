@@ -322,7 +322,7 @@ def apply_camera_exif(
 def strip_ai_markers(img_bytes: bytes) -> bytes:
     """Strip known AI-generation markers from image bytes.
 
-    Removes PNG tEXt/iTXt chunks containing 'parameters', 'fooocus',
+    Removes PNG tEXt/iTXt chunks containing 'parameters', 'freyra',
     'comfy', 'workflow', 'prompt', and C2PA content credential markers.
     Works on PNG only; JPEG/WEBP markers are handled by piexif overwrite.
     """
@@ -333,7 +333,7 @@ def strip_ai_markers(img_bytes: bytes) -> bytes:
     if img_bytes[:8] != PNG_SIG:
         return img_bytes
 
-    AI_KEYWORDS = {b'parameters', b'fooocus', b'comfy', b'workflow',
+    AI_KEYWORDS = {b'parameters', b'freyra', b'comfy', b'workflow',
                    b'prompt', b'sd-metadata', b'ai', b'generation'}
     STRIP_CHUNK_TYPES = {b'tEXt', b'iTXt', b'zTXt'}
     C2PA_MARKER = b'c2pa'

@@ -16,7 +16,7 @@ import modules.async_worker as worker
 import modules.constants as constants
 import modules.flags as flags
 import args_manager
-import fooocus_version
+import freyra_version
 
 from modules.auth import auth_enabled, check_auth
 from modules.prompt_assembler import (
@@ -149,7 +149,7 @@ def _build_task_params(
     params = {
         'prompt': assembled['prompt'],
         'negative_prompt': assembled['negative_prompt'],
-        'styles': assembled.get('styles', ['Fooocus V2', 'SAI Photographic', 'Fooocus Negative']),
+        'styles': assembled.get('styles', ['Freyra V2', 'SAI Photographic', 'Freyra Negative']),
         'performance': quality['performance'],
         'generation_steps': quality['steps'],
         'aspect_ratio': aspect_ratio,
@@ -279,7 +279,7 @@ def build_ui():
 
     theme = create_freyra_theme()
     shared.gradio_root = gr.Blocks(
-        title=f'{FREYRA_TITLE} {fooocus_version.version}',
+        title=f'{FREYRA_TITLE} {freyra_version.version}',
         theme=theme,
         css=FREYRA_CSS,
     ).queue()

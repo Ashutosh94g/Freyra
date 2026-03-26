@@ -1,10 +1,10 @@
 volumes:
-  fooocus-data:
+  freyra-data:
 
 services:
   app:
     build: .
-    image: ghcr.io/lllyasviel/fooocus
+    image: ghcr.io/lllyasviel/freyra
     ports:
      - "7865:7865"
     environment:
@@ -20,10 +20,10 @@ services:
       - path_inpaint=/content/data/models/inpaint/
       - path_controlnet=/content/data/models/controlnet/
       - path_clip_vision=/content/data/models/clip_vision/
-      - path_fooocus_expansion=/content/data/models/prompt_expansion/fooocus_expansion/
+      - path_freyra_expansion=/content/data/models/prompt_expansion/freyra_expansion/
       - path_outputs=/content/app/outputs/    # Warning: If it is not located under '/content/app', you can't see history log!
     volumes:
-      - fooocus-data:/content/data
+      - freyra-data:/content/data
       #- ./models:/import/models   # Once you import files, you don't need to mount again.
       #- ./outputs:/import/outputs  # Once you import files, you don't need to mount again.
     tty: true

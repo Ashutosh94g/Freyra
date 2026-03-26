@@ -1,10 +1,10 @@
-# Fooocus on Docker
+# Freyra on Docker
 
 The docker image is based on NVIDIA CUDA 12.4 and PyTorch 2.1, see [Dockerfile](Dockerfile) and [requirements_docker.txt](requirements_docker.txt) for details.
 
 ## Requirements
 
-- A computer with specs good enough to run Fooocus, and proprietary Nvidia drivers
+- A computer with specs good enough to run Freyra, and proprietary Nvidia drivers
 - Docker, Docker Compose, or Podman
 
 ## Quick start
@@ -19,7 +19,7 @@ The docker image is based on NVIDIA CUDA 12.4 and PyTorch 2.1, see [Dockerfile](
 ### Running with Docker
 
 ```sh
-docker run -p 7865:7865 -v fooocus-data:/content/data -it \
+docker run -p 7865:7865 -v freyra-data:/content/data -it \
 --gpus all \
 -e CMDARGS=--listen \
 -e DATADIR=/content/data \
@@ -33,14 +33,14 @@ docker run -p 7865:7865 -v fooocus-data:/content/data -it \
 -e path_inpaint=/content/data/models/inpaint/ \
 -e path_controlnet=/content/data/models/controlnet/ \
 -e path_clip_vision=/content/data/models/clip_vision/ \
--e path_fooocus_expansion=/content/data/models/prompt_expansion/fooocus_expansion/ \
+-e path_freyra_expansion=/content/data/models/prompt_expansion/freyra_expansion/ \
 -e path_outputs=/content/app/outputs/ \
-ghcr.io/lllyasviel/fooocus
+ghcr.io/lllyasviel/freyra
 ```
 ### Running with Podman
 
 ```sh
-podman run -p 7865:7865 -v fooocus-data:/content/data -it \
+podman run -p 7865:7865 -v freyra-data:/content/data -it \
 --security-opt=no-new-privileges --cap-drop=ALL --security-opt label=type:nvidia_container_t --device=nvidia.com/gpu=all \
 -e CMDARGS=--listen \
 -e DATADIR=/content/data \
@@ -54,14 +54,14 @@ podman run -p 7865:7865 -v fooocus-data:/content/data -it \
 -e path_inpaint=/content/data/models/inpaint/ \
 -e path_controlnet=/content/data/models/controlnet/ \
 -e path_clip_vision=/content/data/models/clip_vision/ \
--e path_fooocus_expansion=/content/data/models/prompt_expansion/fooocus_expansion/ \
+-e path_freyra_expansion=/content/data/models/prompt_expansion/freyra_expansion/ \
 -e path_outputs=/content/app/outputs/ \
-ghcr.io/lllyasviel/fooocus
+ghcr.io/lllyasviel/freyra
 ```
 
 When you see the message  `Use the app with http://0.0.0.0:7865/` in the console, you can access the URL in your browser.
 
-Your models and outputs are stored in the `fooocus-data` volume, which, depending on OS, is stored in `/var/lib/docker/volumes/` (or `~/.local/share/containers/storage/volumes/` when using `podman`).
+Your models and outputs are stored in the `freyra-data` volume, which, depending on OS, is stored in `/var/lib/docker/volumes/` (or `~/.local/share/containers/storage/volumes/` when using `podman`).
 
 ## Building the container locally
 
@@ -69,20 +69,20 @@ Clone the repository first, and open a terminal in the folder.
 
 Build with `docker`:
 ```sh
-docker build . -t fooocus
+docker build . -t freyra
 ```
 
 Build with `podman`:
 ```sh
-podman build . -t fooocus
+podman build . -t freyra
 ```
 
 ## Details
 
 ### Update the container manually (`docker compose`)
 
-When you are using `docker compose up` continuously, the container is not updated to the latest version of Fooocus automatically.
-Run `git pull` before executing `docker compose build --no-cache` to build an image with the latest Fooocus version.
+When you are using `docker compose up` continuously, the container is not updated to the latest version of Freyra automatically.
+Run `git pull` before executing `docker compose build --no-cache` to build an image with the latest Freyra version.
 You can then start it with `docker compose up`
 
 ### Import models, outputs

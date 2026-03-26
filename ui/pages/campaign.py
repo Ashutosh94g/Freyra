@@ -78,7 +78,7 @@ def _generate_campaign(
             params = {
                 'prompt': assembled['prompt'],
                 'negative_prompt': assembled['negative_prompt'],
-                'styles': assembled.get('styles', ['Fooocus V2', 'SAI Photographic', 'Fooocus Negative']),
+                'styles': assembled.get('styles', ['Freyra V2', 'SAI Photographic', 'Freyra Negative']),
                 'performance': quality['performance'],
                 'generation_steps': quality['steps'],
                 'aspect_ratio': assembled.get('aspect_ratio', '896*1152'),

@@ -37,8 +37,8 @@
     "default_prompt": "",
     "default_prompt_negative": "",
     "default_styles": [
-        "Fooocus V2",
-        "Fooocus Cinematic"
+        "Freyra V2",
+        "Freyra Cinematic"
     ],
     "default_aspect_ratio": "1152*896",
     "default_overwrite_step": -1,

@@ -29,7 +29,7 @@ SHOOT_TYPES = {
         "aspect_ratio": "896*1152",
         "camera_exif": "Canon EOS R5",
         "lighting_bias": "studio softbox with rim light",
-        "styles": ["Fooocus V2", "SAI Photographic", "Fooocus Negative"],
+        "styles": ["Freyra V2", "SAI Photographic", "Freyra Negative"],
     },
     "gym_fitness": {
         "label": "Gym / Fitness",
@@ -54,7 +54,7 @@ SHOOT_TYPES = {
         "aspect_ratio": "896*1152",
         "camera_exif": "Canon EOS R5",
         "lighting_bias": "harsh gym lighting with overhead spots",
-        "styles": ["Fooocus V2", "SAI Photographic", "Fooocus Negative"],
+        "styles": ["Freyra V2", "SAI Photographic", "Freyra Negative"],
     },
     "beach_swimwear": {
         "label": "Beach / Swimwear",
@@ -79,7 +79,7 @@ SHOOT_TYPES = {
         "aspect_ratio": "896*1152",
         "camera_exif": "Canon EOS R5",
         "lighting_bias": "golden hour warm sunlight",
-        "styles": ["Fooocus V2", "SAI Photographic", "Fooocus Negative"],
+        "styles": ["Freyra V2", "SAI Photographic", "Freyra Negative"],
     },
     "instagram_lifestyle": {
         "label": "Instagram Lifestyle",
@@ -104,7 +104,7 @@ SHOOT_TYPES = {
         "aspect_ratio": "896*1152",
         "camera_exif": "iPhone 15 Pro Max",
         "lighting_bias": "golden hour natural light",
-        "styles": ["Fooocus V2", "SAI Photographic", "Fooocus Negative"],
+        "styles": ["Freyra V2", "SAI Photographic", "Freyra Negative"],
     },
     "yoga_wellness": {
         "label": "Yoga / Wellness",
@@ -129,7 +129,7 @@ SHOOT_TYPES = {
         "aspect_ratio": "896*1152",
         "camera_exif": "Sony A7IV",
         "lighting_bias": "soft morning light with natural warmth",
-        "styles": ["Fooocus V2", "SAI Photographic", "Fooocus Negative"],
+        "styles": ["Freyra V2", "SAI Photographic", "Freyra Negative"],
     },
     "luxury_travel": {
         "label": "Luxury / Travel",
@@ -154,7 +154,7 @@ SHOOT_TYPES = {
         "aspect_ratio": "896*1152",
         "camera_exif": "Sony A7IV",
         "lighting_bias": "warm interior lighting with window light",
-        "styles": ["Fooocus V2", "SAI Photographic", "Fooocus Negative"],
+        "styles": ["Freyra V2", "SAI Photographic", "Freyra Negative"],
     },
     "streetwear_urban": {
         "label": "Streetwear / Urban",
@@ -179,7 +179,7 @@ SHOOT_TYPES = {
         "aspect_ratio": "896*1152",
         "camera_exif": "Canon EOS R5",
         "lighting_bias": "natural overcast outdoor light",
-        "styles": ["Fooocus V2", "SAI Photographic", "Fooocus Negative"],
+        "styles": ["Freyra V2", "SAI Photographic", "Freyra Negative"],
     },
     "beauty_skincare": {
         "label": "Beauty / Skincare",
@@ -204,7 +204,7 @@ SHOOT_TYPES = {
         "aspect_ratio": "1024*1024",
         "camera_exif": "Sony A7IV",
         "lighting_bias": "soft diffused studio lighting with catchlights",
-        "styles": ["Fooocus V2", "SAI Photographic", "Fooocus Negative"],
+        "styles": ["Freyra V2", "SAI Photographic", "Freyra Negative"],
     },
     "activewear": {
         "label": "Activewear",
@@ -229,7 +229,7 @@ SHOOT_TYPES = {
         "aspect_ratio": "896*1152",
         "camera_exif": "Canon EOS R5",
         "lighting_bias": "crisp bright outdoor light",
-        "styles": ["Fooocus V2", "SAI Photographic", "Fooocus Negative"],
+        "styles": ["Freyra V2", "SAI Photographic", "Freyra Negative"],
     },
     "night_evening": {
         "label": "Night / Evening",
@@ -254,7 +254,7 @@ SHOOT_TYPES = {
         "aspect_ratio": "896*1152",
         "camera_exif": "Canon EOS R5",
         "lighting_bias": "neon ambient light with dramatic shadows",
-        "styles": ["Fooocus V2", "SAI Photographic", "Fooocus Negative"],
+        "styles": ["Freyra V2", "SAI Photographic", "Freyra Negative"],
     },
     "casual_coffee": {
         "label": "Casual / Coffee",
@@ -279,7 +279,7 @@ SHOOT_TYPES = {
         "aspect_ratio": "896*1152",
         "camera_exif": "iPhone 15 Pro Max",
         "lighting_bias": "warm natural window light with bokeh",
-        "styles": ["Fooocus V2", "SAI Photographic", "Fooocus Negative"],
+        "styles": ["Freyra V2", "SAI Photographic", "Freyra Negative"],
     },
     "pool_summer": {
         "label": "Pool / Summer",
@@ -304,7 +304,7 @@ SHOOT_TYPES = {
         "aspect_ratio": "896*1152",
         "camera_exif": "Canon EOS R5",
         "lighting_bias": "afternoon sun with warm golden tones",
-        "styles": ["Fooocus V2", "SAI Photographic", "Fooocus Negative"],
+        "styles": ["Freyra V2", "SAI Photographic", "Freyra Negative"],
     },
 }
 

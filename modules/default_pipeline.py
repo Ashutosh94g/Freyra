@@ -8,7 +8,7 @@ import ldm_patched.modules.model_management
 import ldm_patched.modules.latent_formats
 import modules.inpaint_worker
 import extras.vae_interpose as vae_interpose
-from extras.expansion import FooocusExpansion
+from extras.expansion import FreyraExpansion
 
 from ldm_patched.modules.model_base import SDXL, SDXLRefiner
 from modules.sample_hijack import clip_separate
@@ -260,7 +260,7 @@ def refresh_everything(refiner_model_name, base_model_name, loras,
     final_refiner_vae = model_refiner.vae
 
     if final_expansion is None:
-        final_expansion = FooocusExpansion()
+        final_expansion = FreyraExpansion()
 
     prepare_text_encoder(async_call=True)
     clear_all_caches()
@@ -464,7 +464,7 @@ def process_diffusion(positive_cond, negative_cond, steps, switch, width, height
             previewer_end=steps,
             disable_preview=disable_preview
         )
-        print('Fooocus VAE-based swap.')
+        print('Freyra VAE-based swap.')
 
         target_model = target_refiner_unet
         if target_model is None:

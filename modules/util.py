@@ -332,14 +332,14 @@ def extract_styles_from_prompt(prompt, negative_prompt):
     # add prompt expansion if not all styles could be resolved
     if prompt != '':
         if real_prompt != '':
-            extracted.append(modules.sdxl_styles.fooocus_expansion)
+            extracted.append(modules.sdxl_styles.freyra_expansion)
         else:
             # find real_prompt when only prompt expansion is selected
             first_word = prompt.split(', ')[0]
             first_word_positions = [i for i in range(len(prompt)) if prompt.startswith(first_word, i)]
             if len(first_word_positions) > 1:
                 real_prompt = prompt[:first_word_positions[-1]]
-                extracted.append(modules.sdxl_styles.fooocus_expansion)
+                extracted.append(modules.sdxl_styles.freyra_expansion)
                 if real_prompt.endswith(', '):
                     real_prompt = real_prompt[:-2]
 

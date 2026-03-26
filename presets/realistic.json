@@ -37,9 +37,9 @@
     "default_prompt": "",
     "default_prompt_negative": "unrealistic, saturated, high contrast, big nose, painting, drawing, sketch, cartoon, anime, manga, render, CG, 3d, watermark, signature, label",
     "default_styles": [
-        "Fooocus V2",
-        "Fooocus Photograph",
-        "Fooocus Negative"
+        "Freyra V2",
+        "Freyra Photograph",
+        "Freyra Negative"
     ],
     "default_aspect_ratio": "896*1152",
     "default_overwrite_step": -1,

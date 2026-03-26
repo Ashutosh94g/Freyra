@@ -1,11 +1,11 @@
-﻿import gradio as gr
+import gradio as gr
 import random
 import os
 import json
 import time
 import shared
 import modules.config
-import fooocus_version
+import freyra_version
 import modules.html
 import modules.async_worker as worker
 import modules.constants as constants
@@ -143,7 +143,7 @@ def inpaint_mode_change(mode, inpaint_engine_version):
 
 reload_javascript()
 
-title = f'Fooocus {fooocus_version.version}'
+title = f'Freyra {freyra_version.version}'
 
 if isinstance(args_manager.args.preset, str):
     title += ' ' + args_manager.args.preset
@@ -210,7 +210,7 @@ with shared.gradio_root:
                                 uov_input_image = grh.Image(label='Image', source='upload', type='numpy', show_label=False)
                             with gr.Column():
                                 uov_method = gr.Radio(label='Upscale or Variation:', choices=flags.uov_list, value=modules.config.default_uov_method)
-                                gr.HTML('<a href="https://github.com/lllyasviel/Fooocus/discussions/390" target="_blank">\U0001F4D4 Documentation</a>')
+                                gr.HTML('<a href="https://github.com/lllyasviel/Freyra/discussions/390" target="_blank">\U0001F4D4 Documentation</a>')
                     with gr.Tab(label='Image Prompt', id='ip_tab') as ip_tab:
                         with gr.Row():
                             ip_images = []
@@ -242,7 +242,7 @@ with shared.gradio_root:
                                         ip_type.change(lambda x: flags.default_parameters[x], inputs=[ip_type], outputs=[ip_stop, ip_weight], queue=False, show_progress="hidden")
                                     ip_ad_cols.append(ad_col)
                         ip_advanced = gr.Checkbox(label='Advanced', value=modules.config.default_image_prompt_advanced_checkbox, container=False)
-                        gr.HTML('* \"Image Prompt\" is powered by Fooocus Image Mixture Engine (v1.0.1). <a href="https://github.com/lllyasviel/Fooocus/discussions/557" target="_blank">\U0001F4D4 Documentation</a>')
+                        gr.HTML('* \"Image Prompt\" is powered by Freyra Image Mixture Engine (v1.0.1). <a href="https://github.com/lllyasviel/Freyra/discussions/557" target="_blank">\U0001F4D4 Documentation</a>')
 
                         def ip_advance_checked(x):
                             return [gr.update(visible=x)] * len(ip_ad_cols) + \
@@ -266,7 +266,7 @@ with shared.gradio_root:
                                                                      label='Additional Prompt Quick List',
                                                                      components=[inpaint_additional_prompt],
                                                                      visible=False)
-                                gr.HTML('* Powered by Fooocus Inpaint Engine <a href="https://github.com/lllyasviel/Fooocus/discussions/414" target="_blank">\U0001F4D4 Documentation</a>')
+                                gr.HTML('* Powered by Freyra Inpaint Engine <a href="https://github.com/lllyasviel/Freyra/discussions/414" target="_blank">\U0001F4D4 Documentation</a>')
                                 example_inpaint_prompts.click(lambda x: x[0], inputs=example_inpaint_prompts, outputs=inpaint_additional_prompt, show_progress="hidden", queue=False)
 
                             with gr.Column(visible=modules.config.default_inpaint_advanced_masking_checkbox) as inpaint_mask_generation_col:
@@ -343,7 +343,7 @@ with shared.gradio_root:
                                 describe_apply_styles = gr.Checkbox(label='Apply Styles', value=modules.config.default_describe_apply_prompts_checkbox)
                                 describe_btn = gr.Button(value='Describe this Image into Prompt')
                                 describe_image_size = gr.Textbox(label='Image Size and Recommended Size', elem_id='describe_image_size', visible=False)
-                                gr.HTML('<a href="https://github.com/lllyasviel/Fooocus/discussions/1363" target="_blank">\U0001F4D4 Documentation</a>')
+                                gr.HTML('<a href="https://github.com/lllyasviel/Freyra/discussions/1363" target="_blank">\U0001F4D4 Documentation</a>')
 
                                 def trigger_show_image_properties(image):
                                     value = modules.util.get_image_size_info(image, modules.flags.sdxl_aspect_ratios)
@@ -356,11 +356,11 @@ with shared.gradio_root:
                         with gr.Row():
                             with gr.Column():
                                 enhance_input_image = grh.Image(label='Use with Enhance, skips image generation', source='upload', type='numpy')
-                                gr.HTML('<a href="https://github.com/lllyasviel/Fooocus/discussions/3281" target="_blank">\U0001F4D4 Documentation</a>')
+                                gr.HTML('<a href="https://github.com/lllyasviel/Freyra/discussions/3281" target="_blank">\U0001F4D4 Documentation</a>')
 
                     with gr.Tab(label='Metadata', id='metadata_tab') as metadata_tab:
                         with gr.Column():
-                            metadata_input_image = grh.Image(label='For images created by Fooocus', source='upload', type='pil')
+                            metadata_input_image = grh.Image(label='For images created by Freyra', source='upload', type='pil')
                             metadata_json = gr.JSON(label='Metadata')
                             metadata_import_button = gr.Button(value='Apply Metadata')
 
@@ -400,7 +400,7 @@ with shared.gradio_root:
                                                                     inputs=enhance_uov_processing_order,
                                                                     outputs=enhance_uov_prompt_type,
                                                                     queue=False, show_progress="hidden")
-                                gr.HTML('<a href="https://github.com/lllyasviel/Fooocus/discussions/3281" target="_blank">\U0001F4D4 Documentation</a>')
+                                gr.HTML('<a href="https://github.com/lllyasviel/Freyra/discussions/3281" target="_blank">\U0001F4D4 Documentation</a>')
                     enhance_ctrls = []
                     enhance_inpaint_mode_ctrls = []
                     enhance_inpaint_engine_ctrls = []
@@ -470,7 +470,7 @@ with shared.gradio_root:
                                 enhance_inpaint_engine = gr.Dropdown(label='Inpaint Engine',
                                                                      value=modules.config.default_inpaint_engine_version,
                                                                      choices=flags.inpaint_engine_versions,
-                                                                     info='Version of Fooocus inpaint model. If set, use performance Quality or Speed (no performance LoRAs) for best results.')
+                                                                     info='Version of Freyra inpaint model. If set, use performance Quality or Speed (no performance LoRAs) for best results.')
                                 enhance_inpaint_strength = gr.Slider(label='Inpaint Denoising Strength',
                                                                      minimum=0.0, maximum=1.0, step=0.001,
                                                                      value=1.0,
@@ -492,7 +492,7 @@ with shared.gradio_root:
                                                                                  '(default is 0, always processed before any mask invert)')
                                 enhance_mask_invert = gr.Checkbox(label='Invert Mask', value=False)
 
-                            gr.HTML('<a href="https://github.com/lllyasviel/Fooocus/discussions/3281" target="_blank">\U0001F4D4 Documentation</a>')
+                            gr.HTML('<a href="https://github.com/lllyasviel/Freyra/discussions/3281" target="_blank">\U0001F4D4 Documentation</a>')
 
                         enhance_ctrls += [
                             enhance_enabled,
@@ -743,7 +743,7 @@ with shared.gradio_root:
                 sharpness = gr.Slider(label='Image Sharpness', minimum=0.0, maximum=30.0, step=0.001,
                                       value=modules.config.default_sample_sharpness,
                                       info='Higher value means image and texture are sharper.')
-                gr.HTML('<a href="https://github.com/lllyasviel/Fooocus/discussions/117" target="_blank">\U0001F4D4 Documentation</a>')
+                gr.HTML('<a href="https://github.com/lllyasviel/Freyra/discussions/117" target="_blank">\U0001F4D4 Documentation</a>')
                 dev_mode = gr.Checkbox(label='Developer Debug Mode', value=modules.config.default_developer_debug_mode_checkbox, container=False)
 
                 with gr.Column(visible=modules.config.default_developer_debug_mode_checkbox) as dev_tools:
@@ -761,7 +761,7 @@ with shared.gradio_root:
 
                         adaptive_cfg = gr.Slider(label='CFG Mimicking from TSNR', minimum=1.0, maximum=30.0, step=0.01,
                                                  value=modules.config.default_cfg_tsnr,
-                                                 info='Enabling Fooocus\'s implementation of CFG mimicking for TSNR '
+                                                 info='Enabling Freyra\'s implementation of CFG mimicking for TSNR '
                                                       '(effective when real CFG > mimicked CFG).')
                         clip_skip = gr.Slider(label='CLIP Skip', minimum=1, maximum=flags.clip_skip_max, step=1,
                                                  value=modules.config.default_clip_skip,
@@ -866,7 +866,7 @@ with shared.gradio_root:
                         inpaint_engine = gr.Dropdown(label='Inpaint Engine',
                                                      value=modules.config.default_inpaint_engine_version,
                                                      choices=flags.inpaint_engine_versions,
-                                                     info='Version of Fooocus inpaint model. If set, use performance Quality or Speed (no performance LoRAs) for best results.')
+                                                     info='Version of Freyra inpaint model. If set, use performance Quality or Speed (no performance LoRAs) for best results.')
                         inpaint_strength = gr.Slider(label='Inpaint Denoising Strength',
                                                      minimum=0.0, maximum=1.0, step=0.001, value=1.0,
                                                      info='Same as the denoising strength in A1111 inpaint. '
@@ -1130,12 +1130,12 @@ with shared.gradio_root:
             if flags.describe_type_photo in modes:
                 from extras.interrogate import default_interrogator as default_interrogator_photo
                 describe_prompts.append(default_interrogator_photo(img))
-                styles.update(["Fooocus V2", "Fooocus Enhance", "Fooocus Sharp"])
+                styles.update(["Freyra V2", "Freyra Enhance", "Freyra Sharp"])
 
             if flags.describe_type_anime in modes:
                 from extras.wd14tagger import default_interrogator as default_interrogator_anime
                 describe_prompts.append(default_interrogator_anime(img))
-                styles.update(["Fooocus V2", "Fooocus Masterpiece"])
+                styles.update(["Freyra V2", "Freyra Masterpiece"])
 
             if len(styles) == 0 or not apply_styles:
                 styles = gr.update()

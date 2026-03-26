@@ -153,7 +153,7 @@ def assemble_prompt(
         'negative_prompt': shoot_type_config.get('negative_prompt', ''),
         'cfg_scale': shoot_type_config.get('cfg_scale', 4.5),
         'sharpness': shoot_type_config.get('sharpness', 2.0),
-        'styles': shoot_type_config.get('styles', ['Fooocus V2', 'SAI Photographic', 'Fooocus Negative']),
+        'styles': shoot_type_config.get('styles', ['Freyra V2', 'SAI Photographic', 'Freyra Negative']),
         'aspect_ratio': shoot_type_config.get('aspect_ratio', '896*1152'),
         'loras': shoot_type_config.get('loras', []),
     }

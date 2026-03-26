@@ -37,9 +37,9 @@
     "default_prompt": "",
     "default_prompt_negative": "",
     "default_styles": [
-        "Fooocus V2",
-        "Fooocus Enhance",
-        "Fooocus Sharp"
+        "Freyra V2",
+        "Freyra Enhance",
+        "Freyra Sharp"
     ],
     "default_aspect_ratio": "1152*896",
     "checkpoint_downloads": {

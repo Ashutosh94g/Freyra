@@ -114,7 +114,7 @@ def sample_hacked(model, noise, positive, negative, cfg, device, sampler, sigmas
         create_cond_with_same_area_if_none(positive, c)
 
     # pre_run_control(model, negative + positive)
-    pre_run_control(model, positive)  # negative is not necessary in Fooocus, 0.5s faster.
+    pre_run_control(model, positive)  # negative is not necessary in Freyra, 0.5s faster.
 
     apply_empty_x_to_equal_area(list(filter(lambda c: c.get('control_apply_to_uncond', False) == True, positive)), negative, 'control', lambda cond_cnets, x: cond_cnets[x])
     apply_empty_x_to_equal_area(positive, negative, 'gligen', lambda cond_cnets, x: cond_cnets[x])

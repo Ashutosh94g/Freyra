@@ -59,7 +59,7 @@ def log(img, metadata, metadata_parser: MetadataParser | None = None, output_for
         elif parsed_parameters != '':
             pnginfo = PngInfo()
             pnginfo.add_text('parameters', parsed_parameters)
-            pnginfo.add_text('fooocus_scheme', metadata_parser.get_scheme().value)
+            pnginfo.add_text('freyra_scheme', metadata_parser.get_scheme().value)
             image.save(local_temp_filename, pnginfo=pnginfo)
         else:
             image.save(local_temp_filename)
@@ -122,14 +122,14 @@ def log(img, metadata, metadata_parser: MetadataParser | None = None, output_for
         </script>"""
     )
 
-    begin_part = f"<!DOCTYPE html><html><head><title>Fooocus Log {date_string}</title>{css_styles}</head><body>{js}<p>Fooocus Log {date_string} (private)</p>\n<p>Metadata is embedded if enabled in the config or developer debug mode. You can find the information for each image in line Metadata Scheme.</p><!--fooocus-log-split-->\n\n"
-    end_part = f'\n<!--fooocus-log-split--></body></html>'
+    begin_part = f"<!DOCTYPE html><html><head><title>Freyra Log {date_string}</title>{css_styles}</head><body>{js}<p>Freyra Log {date_string} (private)</p>\n<p>Metadata is embedded if enabled in the config or developer debug mode. You can find the information for each image in line Metadata Scheme.</p><!--freyra-log-split-->\n\n"
+    end_part = f'\n<!--freyra-log-split--></body></html>'
 
     middle_part = log_cache.get(html_name, "")
 
     if middle_part == "":
         if os.path.exists(html_name):
-            existing_split = open(html_name, 'r', encoding='utf-8').read().split('<!--fooocus-log-split-->')
+            existing_split = open(html_name, 'r', encoding='utf-8').read().split('<!--freyra-log-split-->')
             if len(existing_split) == 3:
                 middle_part = existing_split[1]
             else:

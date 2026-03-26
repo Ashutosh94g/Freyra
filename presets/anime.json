@@ -37,9 +37,9 @@
     "default_prompt": "",
     "default_prompt_negative": "",
     "default_styles": [
-        "Fooocus V2",
-        "Fooocus Semi Realistic",
-        "Fooocus Masterpiece"
+        "Freyra V2",
+        "Freyra Semi Realistic",
+        "Freyra Masterpiece"
     ],
     "default_aspect_ratio": "896*1152",
     "default_overwrite_step": -1,

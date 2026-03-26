@@ -109,7 +109,7 @@ class AsyncTask:
         self.save_final_enhanced_image_only = args.pop() if not args_manager.args.disable_image_log else False
         self.save_metadata_to_images = args.pop() if not args_manager.args.disable_metadata else False
         self.metadata_scheme = MetadataScheme(
-            args.pop()) if not args_manager.args.disable_metadata else MetadataScheme.FOOOCUS
+            args.pop()) if not args_manager.args.disable_metadata else MetadataScheme.FREYRA
 
         # Influencer Builder controls
         from modules.influencer_builder import BUILDER_CATEGORIES, NONE_OPTION, get_effective_value
@@ -332,10 +332,10 @@ def worker():
     import modules.constants as constants
     import extras.ip_adapter as ip_adapter
     import extras.face_crop
-    import fooocus_version
+    import freyra_version
 
     from extras.censor import default_censor
-    from modules.sdxl_styles import apply_style, get_random_style, fooocus_expansion, apply_arrays, random_style_name
+    from modules.sdxl_styles import apply_style, get_random_style, freyra_expansion, apply_arrays, random_style_name
     from modules.private_logger import log
     from extras.expansion import safe_str
     from modules.util import (remove_empty_str, HWC3, resize_image, get_image_shape_ceil, set_image_shape_ceil,
@@ -358,7 +358,7 @@ def worker():
         print(e)
 
     def progressbar(async_task, number, text):
-        print(f'[Fooocus] {text}')
+        print(f'[Freyra] {text}')
         async_task.yields.append(['preview', (number, text, None)])
 
     def yield_result(async_task, imgs, progressbar_index, black_out_nsfw, censor=True, do_not_show_finished_images=False):
@@ -509,9 +509,9 @@ def worker():
                 pass
             d = [('Prompt', 'prompt', task['log_positive_prompt']),
                  ('Negative Prompt', 'negative_prompt', task['log_negative_prompt']),
-                 ('Fooocus V2 Expansion', 'prompt_expansion', task['expansion']),
+                 ('Freyra V2 Expansion', 'prompt_expansion', task['expansion']),
                  ('Styles', 'styles',
-                  str(task['styles'] if not use_expansion else [fooocus_expansion] + task['styles'])),
+                  str(task['styles'] if not use_expansion else [freyra_expansion] + task['styles'])),
                  ('Performance', 'performance', async_task.performance_selection.value),
                  ('Steps', 'steps', async_task.steps),
                  ('Resolution', 'resolution', str((width, height))),
@@ -558,7 +558,7 @@ def worker():
                                          loras, async_task.vae_name)
             d.append(('Metadata Scheme', 'metadata_scheme',
                       async_task.metadata_scheme.value if async_task.save_metadata_to_images else async_task.save_metadata_to_images))
-            d.append(('Version', 'version', 'Fooocus v' + fooocus_version.version))
+            d.append(('Version', 'version', 'Freyra v' + freyra_version.version))
             img_paths.append(log(x, d, metadata_parser, async_task.output_format, task, persist_image))
 
         return img_paths
@@ -913,7 +913,7 @@ def worker():
                 current_progress += 1
             for i, t in enumerate(tasks):
 
-                progressbar(async_task, current_progress, f'Preparing Fooocus text #{i + 1} ...')
+                progressbar(async_task, current_progress, f'Preparing Freyra text #{i + 1} ...')
                 expansion = pipeline.final_expansion(t['task_prompt'], t['task_seed'])
                 print(f'[Prompt Expansion] {expansion}')
                 t['expansion'] = expansion
@@ -1256,9 +1256,9 @@ def worker():
         async_task.uov_method = async_task.uov_method.casefold()
         async_task.enhance_uov_method = async_task.enhance_uov_method.casefold()
 
-        if fooocus_expansion in async_task.style_selections:
+        if freyra_expansion in async_task.style_selections:
             use_expansion = True
-            async_task.style_selections.remove(fooocus_expansion)
+            async_task.style_selections.remove(freyra_expansion)
         else:
             use_expansion = False
 

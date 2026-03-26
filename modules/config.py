@@ -71,7 +71,7 @@ def try_load_deprecated_user_path_config():
         replace_config('inpaint_models_path', 'path_inpaint')
         replace_config('controlnet_models_path', 'path_controlnet')
         replace_config('clip_vision_models_path', 'path_clip_vision')
-        replace_config('fooocus_expansion_path', 'path_fooocus_expansion')
+        replace_config('freyra_expansion_path', 'path_freyra_expansion')
         replace_config('temp_outputs_path', 'path_outputs')
 
         if deprecated_config_dict.get("default_model", None) == 'juggernautXL_version6Rundiffusion.safetensors':
@@ -197,7 +197,7 @@ path_upscale_models = get_dir_or_set_default('path_upscale_models', '../models/u
 path_inpaint = get_dir_or_set_default('path_inpaint', '../models/inpaint/')
 path_controlnet = get_dir_or_set_default('path_controlnet', '../models/controlnet/')
 path_clip_vision = get_dir_or_set_default('path_clip_vision', '../models/clip_vision/')
-path_fooocus_expansion = get_dir_or_set_default('path_fooocus_expansion', '../models/prompt_expansion/fooocus_expansion')
+path_freyra_expansion = get_dir_or_set_default('path_freyra_expansion', '../models/prompt_expansion/freyra_expansion')
 path_wildcards = get_dir_or_set_default('path_wildcards', '../wildcards/')
 path_safety_checker = get_dir_or_set_default('path_safety_checker', '../models/safety_checker/')
 path_sam = get_dir_or_set_default('path_sam', '../models/sam/')
@@ -253,7 +253,7 @@ def init_temp_path(path: str | None, default_path: str) -> str:
     return default_path
 
 
-default_temp_path = os.path.join(tempfile.gettempdir(), 'fooocus')
+default_temp_path = os.path.join(tempfile.gettempdir(), 'freyra')
 temp_path = init_temp_path(get_config_item_or_set_default(
     key='temp_path',
     default_value=default_temp_path,
@@ -377,9 +377,9 @@ default_vae = get_config_item_or_set_default(
 default_styles = get_config_item_or_set_default(
     key='default_styles',
     default_value=[
-        "Fooocus V2",
-        "Fooocus Enhance",
-        "Fooocus Sharp"
+        "Freyra V2",
+        "Freyra Enhance",
+        "Freyra Sharp"
     ],
     validator=lambda x: isinstance(x, list) and all(y in modules.sdxl_styles.legal_style_names for y in x),
     expected_type=list
@@ -664,7 +664,7 @@ default_save_metadata_to_images = get_config_item_or_set_default(
 )
 default_metadata_scheme = get_config_item_or_set_default(
     key='default_metadata_scheme',
-    default_value=MetadataScheme.FOOOCUS.value,
+    default_value=MetadataScheme.FREYRA.value,
     validator=lambda x: x in [y[1] for y in modules.flags.metadata_scheme if y[1] == x],
     expected_type=str
 )
@@ -864,7 +864,7 @@ wildcard_filenames = []
 
 def get_model_filenames(folder_paths, extensions=None, name_filter=None):
     if extensions is None:
-        extensions = ['.pth', '.ckpt', '.bin', '.safetensors', '.fooocus.patch']
+        extensions = ['.pth', '.ckpt', '.bin', '.safetensors', '.freyra.patch']
     files = []
 
     if not isinstance(folder_paths, list):
@@ -889,36 +889,36 @@ def downloading_inpaint_models(v):
     assert v in modules.flags.inpaint_engine_versions
 
     load_file_from_url(
-        url='https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/fooocus_inpaint_head.pth',
+        url='https://huggingface.co/lllyasviel/freyra_inpaint/resolve/main/freyra_inpaint_head.pth',
         model_dir=path_inpaint,
-        file_name='fooocus_inpaint_head.pth'
+        file_name='freyra_inpaint_head.pth'
     )
-    head_file = os.path.join(path_inpaint, 'fooocus_inpaint_head.pth')
+    head_file = os.path.join(path_inpaint, 'freyra_inpaint_head.pth')
     patch_file = None
 
     if v == 'v1':
         load_file_from_url(
-            url='https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/inpaint.fooocus.patch',
+            url='https://huggingface.co/lllyasviel/freyra_inpaint/resolve/main/inpaint.freyra.patch',
             model_dir=path_inpaint,
-            file_name='inpaint.fooocus.patch'
+            file_name='inpaint.freyra.patch'
         )
-        patch_file = os.path.join(path_inpaint, 'inpaint.fooocus.patch')
+        patch_file = os.path.join(path_inpaint, 'inpaint.freyra.patch')
 
     if v == 'v2.5':
         load_file_from_url(
-            url='https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/inpaint_v25.fooocus.patch',
+            url='https://huggingface.co/lllyasviel/freyra_inpaint/resolve/main/inpaint_v25.freyra.patch',
             model_dir=path_inpaint,
-            file_name='inpaint_v25.fooocus.patch'
+            file_name='inpaint_v25.freyra.patch'
         )
-        patch_file = os.path.join(path_inpaint, 'inpaint_v25.fooocus.patch')
+        patch_file = os.path.join(path_inpaint, 'inpaint_v25.freyra.patch')
 
     if v == 'v2.6':
         load_file_from_url(
-            url='https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/inpaint_v26.fooocus.patch',
+            url='https://huggingface.co/lllyasviel/freyra_inpaint/resolve/main/inpaint_v26.freyra.patch',
             model_dir=path_inpaint,
-            file_name='inpaint_v26.fooocus.patch'
+            file_name='inpaint_v26.freyra.patch'
         )
-        patch_file = os.path.join(path_inpaint, 'inpaint_v26.fooocus.patch')
+        patch_file = os.path.join(path_inpaint, 'inpaint_v26.freyra.patch')
 
     return head_file, patch_file
 
@@ -961,11 +961,11 @@ def downloading_controlnet_canny():
 
 def downloading_controlnet_cpds():
     load_file_from_url(
-        url='https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_xl_cpds_128.safetensors',
+        url='https://huggingface.co/lllyasviel/misc/resolve/main/freyra_xl_cpds_128.safetensors',
         model_dir=path_controlnet,
-        file_name='fooocus_xl_cpds_128.safetensors'
+        file_name='freyra_xl_cpds_128.safetensors'
     )
-    return os.path.join(path_controlnet, 'fooocus_xl_cpds_128.safetensors')
+    return os.path.join(path_controlnet, 'freyra_xl_cpds_128.safetensors')
 
 
 def downloading_ip_adapters(v):
@@ -981,11 +981,11 @@ def downloading_ip_adapters(v):
     results += [os.path.join(path_clip_vision, 'clip_vision_vit_h.safetensors')]
 
     load_file_from_url(
-        url='https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_ip_negative.safetensors',
+        url='https://huggingface.co/lllyasviel/misc/resolve/main/freyra_ip_negative.safetensors',
         model_dir=path_controlnet,
-        file_name='fooocus_ip_negative.safetensors'
+        file_name='freyra_ip_negative.safetensors'
     )
-    results += [os.path.join(path_controlnet, 'fooocus_ip_negative.safetensors')]
+    results += [os.path.join(path_controlnet, 'freyra_ip_negative.safetensors')]
 
     if v == 'ip':
         load_file_from_url(
@@ -1008,11 +1008,11 @@ def downloading_ip_adapters(v):
 
 def downloading_upscale_model():
     load_file_from_url(
-        url='https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_upscaler_s409985e5.bin',
+        url='https://huggingface.co/lllyasviel/misc/resolve/main/freyra_upscaler_s409985e5.bin',
         model_dir=path_upscale_models,
-        file_name='fooocus_upscaler_s409985e5.bin'
+        file_name='freyra_upscaler_s409985e5.bin'
     )
-    return os.path.join(path_upscale_models, 'fooocus_upscaler_s409985e5.bin')
+    return os.path.join(path_upscale_models, 'freyra_upscaler_s409985e5.bin')
 
 def downloading_safety_checker_model():
     load_file_from_url(

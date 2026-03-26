@@ -4,7 +4,7 @@ def match_lora(lora, to_load):
     for x in to_load:
         real_load_key = to_load[x]
         if real_load_key in lora:
-            patch_dict[real_load_key] = ('fooocus', lora[real_load_key])
+            patch_dict[real_load_key] = ('freyra', lora[real_load_key])
             loaded_keys.add(real_load_key)
             continue
 
