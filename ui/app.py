@@ -40,6 +40,11 @@ from modules.skin_detector import detect_skin_tone
 from ui.pages.campaign import build_campaign_tab
 from ui.pages.gallery import build_gallery_tab
 from ui.components.visual_picker import build_visual_picker
+from modules.history_store import (
+    load_history, add_entry as history_add_entry,
+    clear_history, export_history_json, import_history_json,
+    render_history_html,
+)
 
 try:
     from modules.ui_gradio_extensions import reload_javascript
@@ -217,7 +222,7 @@ def generate_clicked(task: worker.AsyncTask):
         gr.update(visible=True, value=modules.html.make_progress_html(1, 'Starting generation...')),
         gr.update(visible=True, value=None),
         gr.update(visible=False, value=None),
-        gr.update(visible=False),
+        gr.update(visible=True, value=[]),
         gr.update(),
     )
 
@@ -235,7 +240,7 @@ def generate_clicked(task: worker.AsyncTask):
                     gr.update(visible=True, value=modules.html.make_progress_html(percentage, title)),
                     gr.update(visible=True, value=image) if image is not None else gr.update(),
                     gr.update(),
-                    gr.update(visible=False),
+                    gr.update(),
                     gr.update(),
                 )
             if flag == 'results':
@@ -243,7 +248,7 @@ def generate_clicked(task: worker.AsyncTask):
                     gr.update(visible=True),
                     gr.update(visible=True),
                     gr.update(visible=True, value=product),
-                    gr.update(visible=False),
+                    gr.update(visible=True, value=product),
                     gr.update(),
                 )
             if flag == 'finish':
@@ -260,6 +265,17 @@ def generate_clicked(task: worker.AsyncTask):
     elapsed = time.perf_counter() - execution_start_time
     print(f'[Freyra] Generation complete: {elapsed:.2f}s')
     return
+
+
+def _capture_history(task):
+    """Capture generation results into server-side history after completion."""
+    prompt = getattr(task, 'prompt', '') or ''
+    seed = getattr(task, 'seed', '?')
+    results = getattr(task, 'results', []) or []
+    image_paths = [r for r in results if isinstance(r, str)]
+    if image_paths:
+        history_add_entry(prompt=prompt, seed=seed, image_paths=image_paths)
+    return render_history_html()
 
 
 def build_ui():
@@ -691,13 +707,26 @@ def build_ui():
                         gallery_ui = build_gallery_tab()
 
                     with gr.Tab(label='History'):
-                        gr.HTML(
-                            value=(
-                                '<div id="freyra-history-panel" '
-                                'style="min-height:200px;padding:8px;">'
-                                '<div style="text-align:center;color:#666;padding:40px;">'
-                                'Loading history...</div></div>'
-                            ),
+                        with gr.Row():
+                            history_refresh_btn = gr.Button(
+                                'Refresh', variant='secondary', size='sm', scale=1,
+                            )
+                            history_export_btn = gr.Button(
+                                'Export JSON', variant='secondary', size='sm', scale=1,
+                            )
+                            history_import_file = gr.File(
+                                label='Import', file_types=['.json'],
+                                visible=True, scale=1,
+                            )
+                            history_clear_btn = gr.Button(
+                                'Clear All', variant='stop', size='sm', scale=1,
+                            )
+                        history_panel = gr.HTML(
+                            value=render_history_html(),
+                            elem_id='freyra-history-panel',
+                        )
+                        history_export_download = gr.File(
+                            label='Download', visible=False, interactive=False,
                         )
 
         # ── Wire: Surprise Me button ──
@@ -727,6 +756,19 @@ def build_ui():
 
         randomize_btn.click(
             on_randomize, outputs=randomize_outputs,
+            queue=False, show_progress='hidden',
+        )
+
+        # ── Wire: Campaign character dropdown sync ──
+        # When characters are saved/deleted in Studio, update Campaign's dropdown too
+        save_char_btn.click(
+            lambda: gr.update(choices=list_profile_names()),
+            outputs=[campaign_ui['character']],
+            queue=False, show_progress='hidden',
+        )
+        delete_char_btn.click(
+            lambda: gr.update(choices=list_profile_names()),
+            outputs=[campaign_ui['character']],
             queue=False, show_progress='hidden',
         )
 
@@ -768,6 +810,52 @@ def build_ui():
                 outputs=[prompt_preview],
                 queue=False, show_progress='hidden',
             )
+
+        # ── Wire: History tab ──
+        history_refresh_btn.click(
+            fn=render_history_html,
+            outputs=[history_panel],
+            queue=False, show_progress='hidden',
+        )
+
+        def _history_clear():
+            clear_history()
+            return render_history_html()
+
+        history_clear_btn.click(
+            fn=_history_clear,
+            outputs=[history_panel],
+            queue=False, show_progress='hidden',
+        )
+
+        def _history_export():
+            import tempfile
+            raw = export_history_json()
+            tmp = os.path.join(tempfile.gettempdir(), 'freyra_history_export.json')
+            with open(tmp, 'w', encoding='utf-8') as f:
+                f.write(raw)
+            return gr.update(value=tmp, visible=True)
+
+        history_export_btn.click(
+            fn=_history_export,
+            outputs=[history_export_download],
+            queue=False, show_progress='hidden',
+        )
+
+        def _history_import(file):
+            if file is None:
+                return render_history_html()
+            with open(file.name, 'r', encoding='utf-8') as f:
+                raw = f.read()
+            import_history_json(raw)
+            return render_history_html()
+
+        history_import_file.change(
+            fn=_history_import,
+            inputs=[history_import_file],
+            outputs=[history_panel],
+            queue=False, show_progress='hidden',
+        )
 
         # ── Wire: generation ──
         def stop_clicked(task):
@@ -853,7 +941,7 @@ def build_ui():
         generate_button.click(
             lambda: (
                 gr.update(visible=True), gr.update(visible=True),
-                gr.update(visible=False), [], True,
+                gr.update(visible=False), gr.update(value=[]), True,
             ),
             outputs=[stop_button, skip_button, generate_button, gallery, state_is_generating],
         ).then(
@@ -874,8 +962,9 @@ def build_ui():
             ),
             outputs=[generate_button, stop_button, skip_button, reuse_seed_btn, state_is_generating],
         ).then(
-            fn=lambda: None,
-            js='() => { if (window.freyraHistoryCapture) window.freyraHistoryCapture(); }',
+            fn=_capture_history,
+            inputs=[current_task],
+            outputs=[history_panel],
         )
 
     return shared.gradio_root
