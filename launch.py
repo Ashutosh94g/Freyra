@@ -173,7 +173,7 @@ def download_models(default_model, previous_default_models, checkpoint_downloads
         load_file_from_url(url=url, model_dir=config.path_vae_approx, file_name=file_name)
 
     load_file_from_url(
-        url='https://huggingface.co/lllyasviel/misc/resolve/main/freyra_expansion.bin',
+        url='https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_expansion.bin',
         model_dir=config.path_freyra_expansion,
         file_name='pytorch_model.bin'
     )

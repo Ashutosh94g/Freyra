@@ -889,7 +889,7 @@ def downloading_inpaint_models(v):
     assert v in modules.flags.inpaint_engine_versions
 
     load_file_from_url(
-        url='https://huggingface.co/lllyasviel/freyra_inpaint/resolve/main/freyra_inpaint_head.pth',
+        url='https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/fooocus_inpaint_head.pth',
         model_dir=path_inpaint,
         file_name='freyra_inpaint_head.pth'
     )
@@ -898,7 +898,7 @@ def downloading_inpaint_models(v):
 
     if v == 'v1':
         load_file_from_url(
-            url='https://huggingface.co/lllyasviel/freyra_inpaint/resolve/main/inpaint.freyra.patch',
+            url='https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/inpaint.fooocus.patch',
             model_dir=path_inpaint,
             file_name='inpaint.freyra.patch'
         )
@@ -906,7 +906,7 @@ def downloading_inpaint_models(v):
 
     if v == 'v2.5':
         load_file_from_url(
-            url='https://huggingface.co/lllyasviel/freyra_inpaint/resolve/main/inpaint_v25.freyra.patch',
+            url='https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/inpaint_v25.fooocus.patch',
             model_dir=path_inpaint,
             file_name='inpaint_v25.freyra.patch'
         )
@@ -914,7 +914,7 @@ def downloading_inpaint_models(v):
 
     if v == 'v2.6':
         load_file_from_url(
-            url='https://huggingface.co/lllyasviel/freyra_inpaint/resolve/main/inpaint_v26.freyra.patch',
+            url='https://huggingface.co/lllyasviel/fooocus_inpaint/resolve/main/inpaint_v26.fooocus.patch',
             model_dir=path_inpaint,
             file_name='inpaint_v26.freyra.patch'
         )
@@ -961,7 +961,7 @@ def downloading_controlnet_canny():
 
 def downloading_controlnet_cpds():
     load_file_from_url(
-        url='https://huggingface.co/lllyasviel/misc/resolve/main/freyra_xl_cpds_128.safetensors',
+        url='https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_xl_cpds_128.safetensors',
         model_dir=path_controlnet,
         file_name='freyra_xl_cpds_128.safetensors'
     )
@@ -981,7 +981,7 @@ def downloading_ip_adapters(v):
     results += [os.path.join(path_clip_vision, 'clip_vision_vit_h.safetensors')]
 
     load_file_from_url(
-        url='https://huggingface.co/lllyasviel/misc/resolve/main/freyra_ip_negative.safetensors',
+        url='https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_ip_negative.safetensors',
         model_dir=path_controlnet,
         file_name='freyra_ip_negative.safetensors'
     )
@@ -1008,7 +1008,7 @@ def downloading_ip_adapters(v):
 
 def downloading_upscale_model():
     load_file_from_url(
-        url='https://huggingface.co/lllyasviel/misc/resolve/main/freyra_upscaler_s409985e5.bin',
+        url='https://huggingface.co/lllyasviel/misc/resolve/main/fooocus_upscaler_s409985e5.bin',
         model_dir=path_upscale_models,
         file_name='freyra_upscaler_s409985e5.bin'
     )
