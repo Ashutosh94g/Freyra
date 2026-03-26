@@ -190,13 +190,8 @@ FREYRA_CSS = """
     background: #141414;
 }
 
-.pro-settings-toggle {
-    opacity: 0.5;
-    font-size: 11px !important;
-}
-
-.pro-settings-toggle:hover {
-    opacity: 0.8;
+.dimension-section .label-wrap:hover {
+    color: #c4852e;
 }
 
 .vram-bar {

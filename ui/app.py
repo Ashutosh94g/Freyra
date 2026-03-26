@@ -79,7 +79,6 @@ def _build_task_params(
     lighting, camera_angle, footwear, custom_prompt,
     face_image_1, face_image_2, face_image_3,
     face_swap_on,
-    pro_enabled, pro_base_model, pro_seed_override, pro_resolution,
     pose_reference_image=None, pose_editor_data=None,
 ):
     """Build a params dict for AsyncTask.from_dict() from creative dimensions."""
@@ -134,17 +133,6 @@ def _build_task_params(
     default_ar = assembled.get('aspect_ratio', '896*1152')
     aspect_ratio = get_smart_aspect_ratio(camera_angle, default=default_ar)
     base_model = modules.config.default_base_model_name
-
-    if pro_enabled:
-        if pro_base_model and pro_base_model != 'None':
-            base_model = pro_base_model
-        if pro_resolution and pro_resolution != 'Default':
-            aspect_ratio = pro_resolution
-        if pro_seed_override and str(pro_seed_override).strip():
-            try:
-                seed = int(pro_seed_override)
-            except (ValueError, TypeError):
-                pass
 
     params = {
         'prompt': assembled['prompt'],
@@ -452,16 +440,19 @@ def build_ui():
                     queue=False, show_progress='hidden',
                 )
 
-                # Hair
+                # Hair Style
                 hair_style_options = load_options('influencer_hair.txt')
-                hair_color_options = load_options('influencer_hair_colors.txt')
-                with gr.Accordion('Hair', open=False, elem_classes=['dimension-section']):
+                with gr.Accordion('Hair Style', open=False, elem_classes=['dimension-section']):
                     hair_style = gr.Dropdown(
-                        label='Hair Style', choices=hair_style_options,
+                        label='Select Hair Style', choices=hair_style_options,
                         value=NONE_OPTION, interactive=True,
                     )
+
+                # Hair Color
+                hair_color_options = load_options('influencer_hair_colors.txt')
+                with gr.Accordion('Hair Color', open=False, elem_classes=['dimension-section']):
                     hair_color = gr.Dropdown(
-                        label='Hair Color', choices=hair_color_options,
+                        label='Select Hair Color', choices=hair_color_options,
                         value=NONE_OPTION, interactive=True,
                     )
 
@@ -561,40 +552,13 @@ def build_ui():
                         lines=2, max_lines=3,
                     )
 
-                # Pro Settings (hidden by default)
-                with gr.Accordion('Pro Settings', open=False, elem_classes=['dimension-section', 'pro-settings-toggle']):
-                    pro_enabled = gr.Checkbox(label='Enable Pro Overrides', value=False)
-                    pro_base_model = gr.Dropdown(
-                        label='Base Model',
-                        choices=['None'] + modules.config.model_filenames,
-                        value='None',
-                        interactive=True,
-                    )
+                # Seed (reproducibility control)
+                with gr.Accordion('Seed', open=False, elem_classes=['dimension-section']):
                     seed_random = gr.Checkbox(label='Random Seed', value=True)
                     image_seed = gr.Textbox(label='Seed', value='0', visible=False)
                     seed_random.change(
                         lambda r: gr.update(visible=not r),
                         inputs=[seed_random], outputs=[image_seed],
-                        queue=False, show_progress='hidden',
-                    )
-                    pro_resolution = gr.Dropdown(
-                        label='Resolution Override',
-                        choices=['Default'] + flags.sdxl_aspect_ratios,
-                        value='Default',
-                        interactive=True,
-                    )
-                    refresh_files = gr.Button(
-                        value='Refresh Model Files',
-                        variant='secondary',
-                        size='sm',
-                    )
-
-                    def refresh_files_clicked():
-                        modules.config.update_files()
-                        return gr.update(choices=['None'] + modules.config.model_filenames)
-
-                    refresh_files.click(
-                        refresh_files_clicked, outputs=[pro_base_model],
                         queue=False, show_progress='hidden',
                     )
 
@@ -838,7 +802,6 @@ def build_ui():
             lighting, camera_angle, footwear, custom_prompt,
             face_image_1, face_image_2, face_image_3,
             face_swap_enabled,
-            pro_enabled, pro_base_model, image_seed, pro_resolution,
             pose_reference_image, pose_editor_output,
         ]
 
@@ -851,7 +814,6 @@ def build_ui():
             lt, ca, fw, cp,
             fi1, fi2, fi3,
             fs_on,
-            pro_en, pro_bm, pro_seed, pro_res,
             pose_ref_img, pose_ed_data,
         ):
             params, seed = _build_task_params(
@@ -865,8 +827,6 @@ def build_ui():
                 custom_prompt=cp,
                 face_image_1=fi1, face_image_2=fi2, face_image_3=fi3,
                 face_swap_on=fs_on,
-                pro_enabled=pro_en, pro_base_model=pro_bm,
-                pro_seed_override=pro_seed, pro_resolution=pro_res,
                 pose_reference_image=pose_ref_img,
                 pose_editor_data=pose_ed_data,
             )
