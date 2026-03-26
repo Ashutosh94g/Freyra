@@ -36,6 +36,7 @@ from modules.character_profiles import (
     list_profile_names, save_profile, load_profile, delete_profile,
 )
 from modules.face_engine import prepare_face_tasks, auto_select_method
+from modules.skin_detector import detect_skin_tone
 from ui.pages.campaign import build_campaign_tab
 from ui.pages.gallery import build_gallery_tab
 
@@ -350,13 +351,41 @@ def build_ui():
                         queue=False, show_progress='hidden',
                     )
 
-                # Skin Tone
+                    # Auto-detect skin tone from uploaded face reference
+                    def auto_detect_skin(img):
+                        if img is None:
+                            return gr.update()
+                        detected = detect_skin_tone(img)
+                        if detected:
+                            return gr.update(value=detected)
+                        return gr.update()
+
+                # Skin Tone (auto-detected from face reference)
                 skin_tone_options = load_options('skin_tones.txt')
                 with gr.Accordion('Skin Tone', open=False, elem_classes=['dimension-section']):
                     skin_tone = gr.Dropdown(
                         label='Skin Tone', choices=skin_tone_options,
                         value=NONE_OPTION, interactive=True,
                     )
+                    gr.Markdown(
+                        '<span style="font-size:11px;color:#666;">'
+                        'Auto-detected from face reference. Override manually if needed.'
+                        '</span>'
+                    )
+
+                # Wire face upload -> skin tone auto-detection
+                face_image_1.change(
+                    auto_detect_skin, inputs=[face_image_1], outputs=[skin_tone],
+                    queue=False, show_progress='hidden',
+                )
+                face_image_2.change(
+                    auto_detect_skin, inputs=[face_image_2], outputs=[skin_tone],
+                    queue=False, show_progress='hidden',
+                )
+                face_image_3.change(
+                    auto_detect_skin, inputs=[face_image_3], outputs=[skin_tone],
+                    queue=False, show_progress='hidden',
+                )
 
                 # Hair
                 hair_style_options = load_options('influencer_hair.txt')
@@ -559,8 +588,10 @@ def build_ui():
                         gallery_ui = build_gallery_tab()
 
         # ── Wire: Surprise Me button ──
+        # Skin tone and hair color are identity traits -- never randomized.
+        # They should come from the reference face or be set manually.
         randomize_outputs = [
-            shoot_type, skin_tone, hair_style, hair_color,
+            shoot_type, hair_style,
             outfit, pose, makeup, expression,
             background, lighting, camera_angle, footwear,
         ]
@@ -570,9 +601,7 @@ def build_ui():
             rand_shoot = random.choice(SHOOT_TYPE_LABELS)
             return [
                 rand_shoot,
-                dims.get('skin_tone', NONE_OPTION),
                 dims.get('hair_style', NONE_OPTION),
-                dims.get('hair_color', NONE_OPTION),
                 dims.get('outfit', NONE_OPTION),
                 dims.get('pose', NONE_OPTION),
                 dims.get('makeup', NONE_OPTION),
