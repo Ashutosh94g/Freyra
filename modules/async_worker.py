@@ -1455,7 +1455,8 @@ def worker():
                 int(current_progress + async_task.callback_steps),
                 f'Sampling step {step + 1}/{total_steps}, image {current_task_id + 1}/{total_count} ...', y)])
 
-        show_intermediate_results = len(tasks) > 1 or async_task.should_enhance
+        show_intermediate_results = (len(tasks) > 1 or async_task.should_enhance
+                                     or getattr(async_task, '_freyra_always_show_results', False))
         persist_image = not async_task.should_enhance or not async_task.save_final_enhanced_image_only
 
         for current_task_id, task in enumerate(tasks):

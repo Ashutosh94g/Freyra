@@ -325,13 +325,255 @@ footer {
     word-break: break-word;
 }
 
-/* Responsive adjustments */
+/* ── Pose Editor ── */
+.pose-reference-upload {
+    border: 2px dashed #333;
+    border-radius: 8px;
+    margin-top: 8px;
+}
+
+.pose-reference-upload:hover {
+    border-color: #c4852e;
+}
+
+/* ── History Panel ── */
+.freyra-history-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0 16px 0;
+    border-bottom: 1px solid #2a2a2a;
+    margin-bottom: 12px;
+}
+
+.freyra-hist-btn {
+    background: #2a2a2a;
+    color: #ccc;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 6px 14px;
+    cursor: pointer;
+    font-size: 12px;
+    display: inline-block;
+    text-align: center;
+}
+
+.freyra-hist-btn:hover {
+    background: #3a3a3a;
+    color: #fff;
+}
+
+.freyra-hist-btn-danger {
+    border-color: #8b0000;
+    color: #ff6b6b;
+}
+
+.freyra-hist-btn-danger:hover {
+    background: #4a0000;
+}
+
+.freyra-history-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+}
+
+.freyra-history-card {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    cursor: default;
+}
+
+.freyra-history-card:hover {
+    border-color: #c4852e;
+    box-shadow: 0 2px 12px rgba(196, 133, 46, 0.15);
+}
+
+.freyra-history-thumb {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    display: block;
+    background: #111;
+}
+
+.freyra-history-no-thumb {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #444;
+    font-size: 13px;
+}
+
+.freyra-history-meta {
+    padding: 10px;
+}
+
+.freyra-history-date {
+    font-size: 11px;
+    color: #888;
+}
+
+.freyra-history-seed {
+    font-size: 11px;
+    color: #c4852e;
+    margin-top: 2px;
+}
+
+.freyra-history-prompt {
+    font-size: 12px;
+    color: #aaa;
+    margin-top: 4px;
+    line-height: 1.3;
+    max-height: 48px;
+    overflow: hidden;
+}
+
+.freyra-history-count {
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+}
+
+/* ── Responsive layout ── */
 @media (max-width: 768px) {
     .freyra-header h1 {
         font-size: 22px;
+        letter-spacing: 1px;
     }
+
+    .freyra-header .subtitle {
+        font-size: 10px;
+    }
+
+    .gradio-container {
+        padding: 4px !important;
+    }
+
+    /* Stack columns vertically on mobile */
+    .gradio-row {
+        flex-direction: column !important;
+    }
+
+    .gradio-column {
+        max-width: 100% !important;
+        flex: 1 1 100% !important;
+    }
+
+    /* Gallery fills full width */
+    .freyra-gallery {
+        min-height: 300px;
+        height: auto !important;
+    }
+
+    .freyra-gallery .gallery-item img {
+        max-width: 100%;
+    }
+
+    /* Accordion compact mode */
+    .dimension-section {
+        margin-bottom: 2px;
+    }
+
+    .dimension-section .label-wrap {
+        padding: 10px 12px !important;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+    }
+
+    .dimension-section .label-wrap span {
+        font-size: 14px !important;
+    }
+
+    /* Touch-friendly inputs */
+    .gradio-dropdown,
+    .gradio-textbox textarea,
+    .gradio-textbox input,
+    .gradio-slider input,
+    .gradio-checkbox input {
+        min-height: 44px !important;
+        font-size: 16px !important;
+    }
+
+    /* Sticky generate button */
+    .freyra-generate-btn {
+        position: sticky;
+        bottom: 8px;
+        z-index: 100;
+        min-height: 52px !important;
+        font-size: 16px !important;
+        box-shadow: 0 -4px 16px rgba(0,0,0,0.6);
+    }
+
+    .freyra-stop-btn {
+        min-height: 44px !important;
+    }
+
+    /* Picker grid compact */
     .visual-picker-grid {
-        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+        gap: 4px;
+        max-height: 240px;
+    }
+
+    .picker-card {
+        min-height: 48px;
+        padding: 8px 6px;
+    }
+
+    .picker-card-label {
+        font-size: 10px;
+    }
+
+    /* Face upload compact */
+    .face-upload-area {
+        min-height: 90px;
+        padding: 8px;
+    }
+
+    /* History compact */
+    .freyra-history-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .freyra-history-thumb {
+        height: 100px;
+    }
+
+    .freyra-history-controls {
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-start;
+    }
+
+    /* Pose editor responsive */
+    .pose-reference-upload img {
+        max-height: 150px;
+    }
+}
+
+/* Extra small screens (phones in portrait) */
+@media (max-width: 480px) {
+    .freyra-header h1 {
+        font-size: 18px;
+    }
+
+    .visual-picker-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .face-upload-area {
+        min-height: 70px;
+    }
+
+    .freyra-generate-btn {
+        min-height: 48px !important;
+        font-size: 14px !important;
     }
 }
 """

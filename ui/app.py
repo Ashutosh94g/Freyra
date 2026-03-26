@@ -48,6 +48,28 @@ except Exception:
     pass
 
 
+def _resolve_pose_image(pose_reference_image, pose_editor_data):
+    """Return a numpy array from either a direct upload or the canvas editor base64 output."""
+    import numpy as np
+
+    if pose_reference_image is not None:
+        return pose_reference_image
+
+    if pose_editor_data and isinstance(pose_editor_data, str) and pose_editor_data.startswith('data:image'):
+        try:
+            import base64
+            from io import BytesIO
+            from PIL import Image
+            header, b64data = pose_editor_data.split(',', 1)
+            img_bytes = base64.b64decode(b64data)
+            pil_img = Image.open(BytesIO(img_bytes)).convert('RGB')
+            return np.array(pil_img)
+        except Exception:
+            pass
+
+    return None
+
+
 def _build_task_params(
     shoot_type_label, quality_label, image_number, image_seed, seed_random,
     skin_tone, hair_style, hair_color,
@@ -58,6 +80,7 @@ def _build_task_params(
     face_image_1, face_image_2, face_image_3,
     face_swap_on,
     pro_enabled, pro_base_model, pro_seed_override, pro_resolution,
+    pose_reference_image=None, pose_editor_data=None,
 ):
     """Build a params dict for AsyncTask.from_dict() from creative dimensions."""
     shoot = get_shoot_type(shoot_type_label)
@@ -141,12 +164,16 @@ def _build_task_params(
         'sampler': 'dpmpp_2m_sde_gpu',
         'scheduler': 'karras',
         'disable_preview': False,
-        'disable_intermediate_results': quality['performance'] in ('Lightning', 'Hyper-SD'),
+        'disable_intermediate_results': False,
         'builder_enabled': False,
+        '_freyra_always_show_results': True,
     }
 
     face_images = [fi for fi in [face_image_1, face_image_2, face_image_3] if fi is not None]
     cn_tasks = prepare_face_tasks(face_images)
+
+    pose_img = _resolve_pose_image(pose_reference_image, pose_editor_data)
+    params['_pose_image'] = pose_img
     params['_cn_tasks'] = cn_tasks
     params['_has_face'] = len(face_images) > 0
     params['_used_seed'] = seed
@@ -159,6 +186,8 @@ def _build_task_params(
 
 def _create_task_from_params(params):
     """Create an AsyncTask from the params dict."""
+    import modules.flags as flags
+
     task = worker.AsyncTask.from_dict(params)
 
     cn_tasks = params.get('_cn_tasks')
@@ -169,8 +198,16 @@ def _create_task_from_params(params):
         task.input_image_checkbox = True
         task.current_tab = 'ip'
 
+    pose_img = params.get('_pose_image')
+    if pose_img is not None:
+        task.cn_tasks[flags.cn_canny].append([pose_img, 0.5, 0.7])
+        task.input_image_checkbox = True
+        if not params.get('_has_face'):
+            task.current_tab = 'ip'
+
     task._face_swap = params.get('_face_swap', False)
     task._face_swap_ref = params.get('_face_swap_ref')
+    task._freyra_always_show_results = params.get('_freyra_always_show_results', False)
 
     return task
 
@@ -451,6 +488,21 @@ def build_ui():
                         placeholder='Or describe your own...',
                         lines=1, max_lines=1,
                     )
+                    gr.Markdown(
+                        '<span style="font-size:12px;color:#888;margin-top:8px;display:block;">'
+                        'Upload a pose reference image or use the stick-figure editor '
+                        'for structural guidance (uses ControlNet internally).'
+                        '</span>'
+                    )
+                    pose_reference_image = gr.Image(
+                        label='Pose Reference Image',
+                        type='numpy',
+                        height=200,
+                        sources=['upload'],
+                        elem_classes=['pose-reference-upload'],
+                    )
+                    from ui.components.pose_editor import build_pose_editor
+                    pose_editor_html, pose_editor_output = build_pose_editor()
 
                 # Makeup
                 makeup_options = load_options('influencer_makeup.txt')
@@ -622,6 +674,13 @@ def build_ui():
                             elem_classes=['freyra-gallery'],
                         )
 
+                        outputs_path = os.path.abspath(modules.config.path_outputs)
+                        output_folder_html = gr.HTML(
+                            value=f'<div style="font-size:12px;color:#888;padding:4px 0;">'
+                                  f'Output folder: <a href="file={outputs_path}" target="_blank" '
+                                  f'style="color:#c4852e;">{outputs_path}</a></div>',
+                        )
+
                         prompt_preview = gr.Textbox(
                             label='Assembled Prompt (read-only)',
                             interactive=False, lines=2, max_lines=4,
@@ -666,6 +725,16 @@ def build_ui():
 
                     with gr.Tab(label='Gallery & Export'):
                         gallery_ui = build_gallery_tab()
+
+                    with gr.Tab(label='History'):
+                        gr.HTML(
+                            value=(
+                                '<div id="freyra-history-panel" '
+                                'style="min-height:200px;padding:8px;">'
+                                '<div style="text-align:center;color:#666;padding:40px;">'
+                                'Loading history...</div></div>'
+                            ),
+                        )
 
         # ── Wire: Surprise Me button ──
         # Skin tone and hair color are identity traits -- never randomized.
@@ -770,6 +839,7 @@ def build_ui():
             face_image_1, face_image_2, face_image_3,
             face_swap_enabled,
             pro_enabled, pro_base_model, image_seed, pro_resolution,
+            pose_reference_image, pose_editor_output,
         ]
 
         def prepare_generation(
@@ -782,6 +852,7 @@ def build_ui():
             fi1, fi2, fi3,
             fs_on,
             pro_en, pro_bm, pro_seed, pro_res,
+            pose_ref_img, pose_ed_data,
         ):
             params, seed = _build_task_params(
                 shoot_type_label=st, quality_label=qm,
@@ -796,6 +867,8 @@ def build_ui():
                 face_swap_on=fs_on,
                 pro_enabled=pro_en, pro_base_model=pro_bm,
                 pro_seed_override=pro_seed, pro_resolution=pro_res,
+                pose_reference_image=pose_ref_img,
+                pose_editor_data=pose_ed_data,
             )
 
             task = _create_task_from_params(params)
@@ -840,6 +913,9 @@ def build_ui():
                 False,
             ),
             outputs=[generate_button, stop_button, skip_button, reuse_seed_btn, state_is_generating],
+        ).then(
+            fn=lambda: None,
+            js='() => { if (window.freyraHistoryCapture) window.freyraHistoryCapture(); }',
         )
 
     return shared.gradio_root
