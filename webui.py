@@ -23,10 +23,6 @@ from modules.private_logger import get_current_html_path
 from modules.ui_gradio_extensions import reload_javascript
 from modules.auth import auth_enabled, check_auth
 from modules.util import is_json
-from modules.influencer_builder import (
-    BUILDER_CATEGORIES, CATEGORY_LABELS, NONE_OPTION,
-    load_dropdown_options, assemble_builder_prompt, get_effective_value,
-)
 
 def get_task(*args):
     args = list(args)
@@ -199,11 +195,11 @@ with shared.gradio_root:
                     stop_button.click(stop_clicked, inputs=currentTask, outputs=currentTask, queue=False, show_progress="hidden", js='cancelGenerateForever')
                     skip_button.click(skip_clicked, inputs=currentTask, outputs=currentTask, queue=False, show_progress="hidden")
             with gr.Row(elem_classes='advanced_check_row'):
-                input_image_checkbox = gr.Checkbox(label='Input Image', value=modules.config.default_image_prompt_checkbox, container=False, elem_classes='min_check')
+                input_image_checkbox = gr.Checkbox(label='Input Image', value=True, visible=False)
                 enhance_checkbox = gr.Checkbox(label='Enhance', value=modules.config.default_enhance_checkbox, container=False, elem_classes='min_check')
                 advanced_checkbox = gr.Checkbox(label='Advanced', value=modules.config.default_advanced_checkbox, container=False, elem_classes='min_check')
-            with gr.Row(visible=modules.config.default_image_prompt_checkbox) as image_input_panel:
-                with gr.Tabs(selected=modules.config.default_selected_image_input_tab_id):
+            with gr.Row(visible=True) as image_input_panel:
+                with gr.Tabs(selected='ip_tab'):
                     with gr.Tab(label='Upscale or Variation', id='uov_tab') as uov_tab:
                         with gr.Row():
                             with gr.Column():
@@ -211,7 +207,7 @@ with shared.gradio_root:
                             with gr.Column():
                                 uov_method = gr.Radio(label='Upscale or Variation:', choices=flags.uov_list, value=modules.config.default_uov_method)
                                 gr.HTML('<a href="https://github.com/lllyasviel/Freyra/discussions/390" target="_blank">\U0001F4D4 Documentation</a>')
-                    with gr.Tab(label='Image Prompt', id='ip_tab') as ip_tab:
+                    with gr.Tab(label='Neural Anchors', id='ip_tab') as ip_tab:
                         with gr.Row():
                             ip_images = []
                             ip_types = []
@@ -219,30 +215,33 @@ with shared.gradio_root:
                             ip_weights = []
                             ip_ctrls = []
                             ip_ad_cols = []
+                            anchor_labels = ['Face Lock (FaceSwap)', 'Pose Blueprint (ControlNet)', 'Style Vibe (ImagePrompt)', 'Extra Feature']
                             for image_count in range(modules.config.default_controlnet_image_count):
                                 image_count += 1
                                 with gr.Column():
-                                    ip_image = grh.Image(label='Image', source='upload', type='numpy', show_label=False, height=300, value=modules.config.default_ip_images[image_count])
+                                    ip_image = grh.Image(label=anchor_labels[image_count-1], source='upload', type='numpy', show_label=True, height=300, value=modules.config.default_ip_images[image_count])
                                     ip_images.append(ip_image)
                                     ip_ctrls.append(ip_image)
-                                    with gr.Column(visible=modules.config.default_image_prompt_advanced_checkbox) as ad_col:
+                                    with gr.Column(visible=True) as ad_col:
                                         with gr.Row():
-                                            ip_stop = gr.Slider(label='Stop At', minimum=0.0, maximum=1.0, step=0.001, value=modules.config.default_ip_stop_ats[image_count])
+                                            override_types = {1: flags.cn_ip_face, 2: flags.cn_canny, 3: flags.cn_ip, 4: flags.cn_ip}
+                                            default_stop, default_weight = flags.default_parameters[override_types[image_count]]
+                                            ip_stop = gr.Slider(label='Stop At', minimum=0.0, maximum=1.0, step=0.001, value=default_stop)
                                             ip_stops.append(ip_stop)
                                             ip_ctrls.append(ip_stop)
 
-                                            ip_weight = gr.Slider(label='Weight', minimum=0.0, maximum=2.0, step=0.001, value=modules.config.default_ip_weights[image_count])
+                                            ip_weight = gr.Slider(label='Weight', minimum=0.0, maximum=2.0, step=0.001, value=default_weight)
                                             ip_weights.append(ip_weight)
                                             ip_ctrls.append(ip_weight)
 
-                                        ip_type = gr.Radio(label='Type', choices=flags.ip_list, value=modules.config.default_ip_types[image_count], container=False)
+                                        ip_type = gr.Radio(label='Type', choices=flags.ip_list, value=override_types[image_count], container=False)
                                         ip_types.append(ip_type)
                                         ip_ctrls.append(ip_type)
 
                                         ip_type.change(lambda x: flags.default_parameters[x], inputs=[ip_type], outputs=[ip_stop, ip_weight], queue=False, show_progress="hidden")
                                     ip_ad_cols.append(ad_col)
-                        ip_advanced = gr.Checkbox(label='Advanced', value=modules.config.default_image_prompt_advanced_checkbox, container=False)
-                        gr.HTML('* \"Image Prompt\" is powered by Freyra Image Mixture Engine (v1.0.1). <a href="https://github.com/lllyasviel/Freyra/discussions/557" target="_blank">\U0001F4D4 Documentation</a>')
+                        ip_advanced = gr.Checkbox(label='Advanced', value=True, container=False, visible=False)
+                        gr.HTML('* \"Neural Anchors\" are powered by Freyra Image Mixture Engine (v1.0.1). <a href=\"https://github.com/lllyasviel/Freyra/discussions/557\" target=\"_blank\">\\U0001F4D4 Documentation</a>')
 
                         def ip_advance_checked(x):
                             return [gr.update(visible=x)] * len(ip_ad_cols) + \
@@ -540,8 +539,6 @@ with shared.gradio_root:
             switch_js = "(x) => {if(x){viewer_to_bottom(100);viewer_to_bottom(500);}else{viewer_to_top();} return x;}"
             down_js = "() => {viewer_to_bottom();}"
 
-            input_image_checkbox.change(lambda x: gr.update(visible=x), inputs=input_image_checkbox,
-                                        outputs=image_input_panel, queue=False, show_progress="hidden", js=switch_js)
             ip_advanced.change(lambda: None, queue=False, show_progress="hidden", js=down_js)
 
             current_tab = gr.Textbox(value='uov', visible=False)
@@ -657,50 +654,7 @@ with shared.gradio_root:
                                                        show_progress="hidden").then(
                     lambda: None, js='()=>{refresh_style_localization();}')
 
-            with gr.Tab(label='Builder'):
-                builder_enabled = gr.Checkbox(label='Enable Influencer Builder', value=modules.config.default_builder_enabled)
-                builder_dropdowns = {}
-                builder_textboxes = {}
-                builder_ctrls = [builder_enabled]
-                for cat_key, wildcard_file in BUILDER_CATEGORIES:
-                    cat_label = CATEGORY_LABELS[cat_key]
-                    options = load_dropdown_options(wildcard_file)
-                    with gr.Accordion(label=cat_label, open=False):
-                        dd = gr.Dropdown(
-                            label=cat_label, choices=options,
-                            value=NONE_OPTION, interactive=True)
-                        tb = gr.Textbox(
-                            label=f'Custom {cat_label}',
-                            placeholder=f'Type custom {cat_label.lower()} to override dropdown...',
-                            lines=1, max_lines=1)
-                        builder_dropdowns[cat_key] = dd
-                        builder_textboxes[cat_key] = tb
-                        builder_ctrls += [dd, tb]
-                builder_preview = gr.Textbox(
-                    label='Builder Preview', interactive=False, lines=2,
-                    placeholder='Select options above to build a prompt...')
 
-                # Wire all dropdowns and textboxes to update the preview
-                all_builder_inputs = [builder_enabled]
-                for cat_key, _ in BUILDER_CATEGORIES:
-                    all_builder_inputs.append(builder_dropdowns[cat_key])
-                    all_builder_inputs.append(builder_textboxes[cat_key])
-
-                def update_builder_preview(enabled, *vals):
-                    if not enabled:
-                        return ''
-                    pairs = list(zip(vals[0::2], vals[1::2]))
-                    effective = {}
-                    for (cat_key, _wf), (dd_val, tb_val) in zip(BUILDER_CATEGORIES, pairs):
-                        effective[cat_key] = get_effective_value(dd_val, tb_val)
-                    return assemble_builder_prompt(**effective)
-
-                for component in all_builder_inputs:
-                    component.change(
-                        update_builder_preview,
-                        inputs=all_builder_inputs,
-                        outputs=builder_preview,
-                        queue=False, show_progress='hidden')
 
             with gr.Tab(label='Models'):
                 with gr.Group():
@@ -1062,7 +1016,6 @@ with shared.gradio_root:
         if not args_manager.args.disable_metadata:
             ctrls += [save_metadata_to_images, metadata_scheme]
 
-        ctrls += builder_ctrls
         ctrls += ip_ctrls
         ctrls += [debugging_dino, dino_erode_or_dilate, debugging_enhance_masks_checkbox,
                   enhance_input_image, enhance_checkbox, enhance_uov_method, enhance_uov_processing_order,

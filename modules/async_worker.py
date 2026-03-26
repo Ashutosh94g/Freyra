@@ -111,14 +111,7 @@ class AsyncTask:
         self.metadata_scheme = MetadataScheme(
             args.pop()) if not args_manager.args.disable_metadata else MetadataScheme.FREYRA
 
-        # Influencer Builder controls
-        from modules.influencer_builder import BUILDER_CATEGORIES, NONE_OPTION, get_effective_value
-        self.builder_enabled = args.pop()
-        self.builder_values = {}
-        for cat_key, _wf in BUILDER_CATEGORIES:
-            dd_val = args.pop()
-            tb_val = args.pop()
-            self.builder_values[cat_key] = get_effective_value(dd_val, tb_val)
+
 
         self.cn_tasks = {x: [] for x in ip_list}
         for _ in range(modules.config.default_controlnet_image_count):
