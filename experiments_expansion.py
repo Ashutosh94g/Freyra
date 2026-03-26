@@ -1,6 +1,6 @@
-from modules.expansion import FooocusExpansion
+from modules.expansion import FreyraExpansion
 
-expansion = FooocusExpansion()
+expansion = FreyraExpansion()
 
 text = 'a handsome man'
 

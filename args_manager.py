@@ -10,7 +10,7 @@ args_parser.parser.add_argument("--language", type=str, default='default',
                                 help="Translate UI using json files in [language] folder. "
                                   "For example, [--language example] will use [language/example.json] for translation.")
 
-# For example, https://github.com/lllyasviel/Fooocus/issues/849
+# For example, https://github.com/lllyasviel/Freyra/issues/849
 args_parser.parser.add_argument("--disable-offload-from-vram", action="store_true",
                                 help="Force loading models to vram when the unload can be avoided. "
                                   "Some Mac users may need this.")
@@ -74,7 +74,7 @@ args_parser.parser.set_defaults(
 
 args_parser.args = args_parser.parser.parse_args()
 
-# (Disable by default because of issues like https://github.com/lllyasviel/Fooocus/issues/724)
+# (Disable by default because of issues like https://github.com/lllyasviel/Freyra/issues/724)
 args_parser.args.always_offload_from_vram = not args_parser.args.disable_offload_from_vram
 
 if args_parser.args.disable_analytics:

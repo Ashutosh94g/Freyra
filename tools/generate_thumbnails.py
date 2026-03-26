@@ -96,7 +96,7 @@ def generate_thumbnail_pil(prompt: str, size=(256, 256)):
 
 
 def generate_with_pipeline(prompt: str, size=(256, 256)):
-    """Generate a thumbnail using the actual Freyra/Fooocus pipeline."""
+    """Generate a thumbnail using the actual Freyra/Freyra pipeline."""
     try:
         import modules.async_worker as worker
         import modules.config
@@ -105,7 +105,7 @@ def generate_with_pipeline(prompt: str, size=(256, 256)):
         params = {
             'prompt': prompt,
             'negative_prompt': 'ugly, blurry, low quality, text, watermark',
-            'styles': ['Fooocus V2', 'SAI Photographic'],
+            'styles': ['Freyra V2', 'SAI Photographic'],
             'performance': 'Lightning',
             'generation_steps': 4,
             'aspect_ratio': '1024*1024',
