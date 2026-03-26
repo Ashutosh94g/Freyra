@@ -11,6 +11,7 @@ cd /d "%~dp0"
 
 python launch.py ^
   --preset influencer ^
+  --always-gpu ^
   --unet-in-fp8-e4m3fn ^
   --vae-in-fp16 ^
   --attention-pytorch
