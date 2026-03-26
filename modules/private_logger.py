@@ -12,7 +12,7 @@ from modules.util import generate_temp_filename
 from modules import metadata_spoof
 
 # Metadata spoofing settings — override via UI or set directly
-spoof_enabled: bool = False
+spoof_enabled: bool = True
 spoof_camera_profile: str = metadata_spoof.DEFAULT_CAMERA
 spoof_gps_coords: tuple | None = None
 spoof_gps_jitter: bool = True
@@ -50,8 +50,12 @@ def log(img, metadata, metadata_parser: MetadataParser | None = None, output_for
 
     if output_format == OutputFormat.PNG.value:
         if spoof_enabled:
-            # When spoofing: save without AI parameters metadata
-            image.save(local_temp_filename)
+            import io
+            buf = io.BytesIO()
+            image.save(buf, format='PNG')
+            clean_bytes = metadata_spoof.strip_ai_markers(buf.getvalue())
+            with open(local_temp_filename, 'wb') as f:
+                f.write(clean_bytes)
         elif parsed_parameters != '':
             pnginfo = PngInfo()
             pnginfo.add_text('parameters', parsed_parameters)

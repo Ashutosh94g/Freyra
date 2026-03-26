@@ -480,7 +480,23 @@ def worker():
 
     def save_and_log(async_task, height, imgs, task, use_expansion, width, loras, persist_image=True) -> list:
         img_paths = []
+
+        face_swap_ref = None
+        if getattr(async_task, '_face_swap', False) and getattr(async_task, '_face_swap_ref', None) is not None:
+            face_swap_ref = async_task._face_swap_ref
+
         for idx, x in enumerate(imgs):
+            if face_swap_ref is not None:
+                try:
+                    from modules.face_swap import swap_face, is_available as fs_available
+                    if fs_available():
+                        swapped = swap_face(face_swap_ref, x, enhance_blend=True)
+                        if swapped is not None:
+                            x = swapped
+                            imgs[idx] = x
+                except Exception:
+                    pass
+
             try:
                 from modules.post_process import auto_enhance
                 from PIL import Image

@@ -39,6 +39,7 @@ from modules.face_engine import prepare_face_tasks, auto_select_method
 from modules.skin_detector import detect_skin_tone
 from ui.pages.campaign import build_campaign_tab
 from ui.pages.gallery import build_gallery_tab
+from ui.components.visual_picker import build_visual_picker
 
 try:
     from modules.ui_gradio_extensions import reload_javascript
@@ -55,6 +56,7 @@ def _build_task_params(
     background, background_custom,
     lighting, camera_angle, footwear, custom_prompt,
     face_image_1, face_image_2, face_image_3,
+    face_swap_on,
     pro_enabled, pro_base_model, pro_seed_override, pro_resolution,
 ):
     """Build a params dict for AsyncTask.from_dict() from creative dimensions."""
@@ -149,6 +151,8 @@ def _build_task_params(
     params['_has_face'] = len(face_images) > 0
     params['_used_seed'] = seed
     params['_camera_angle'] = camera_angle
+    params['_face_swap'] = bool(face_swap_on) and len(face_images) > 0
+    params['_face_swap_ref'] = face_images[0] if (face_swap_on and face_images) else None
 
     return params, seed
 
@@ -164,6 +168,9 @@ def _create_task_from_params(params):
     if params.get('_has_face'):
         task.input_image_checkbox = True
         task.current_tab = 'ip'
+
+    task._face_swap = params.get('_face_swap', False)
+    task._face_swap_ref = params.get('_face_swap_ref')
 
     return task
 
@@ -312,6 +319,11 @@ def build_ui():
                             height=120, sources=['upload'],
                             elem_classes=['face-upload-area'],
                         )
+                    face_swap_enabled = gr.Checkbox(
+                        label='Apply Face Swap (higher fidelity)',
+                        value=True,
+                    )
+
                     with gr.Row():
                         save_char_name = gr.Textbox(
                             label='Character Name', placeholder='Name this character...',
@@ -419,9 +431,8 @@ def build_ui():
                 # Outfit
                 outfit_options = load_options('influencer_outfits.txt')
                 with gr.Accordion('Outfit', open=False, elem_classes=['dimension-section']):
-                    outfit = gr.Dropdown(
-                        label='Select Outfit', choices=outfit_options,
-                        value=NONE_OPTION, interactive=True,
+                    outfit_picker_html, outfit = build_visual_picker(
+                        'influencer_outfits', outfit_options, label='Select Outfit',
                     )
                     outfit_custom = gr.Textbox(
                         label='Custom Outfit',
@@ -432,9 +443,8 @@ def build_ui():
                 # Pose
                 pose_options = load_options('influencer_poses.txt')
                 with gr.Accordion('Pose', open=False, elem_classes=['dimension-section']):
-                    pose = gr.Dropdown(
-                        label='Select Pose', choices=pose_options,
-                        value=NONE_OPTION, interactive=True,
+                    pose_picker_html, pose = build_visual_picker(
+                        'influencer_poses', pose_options, label='Select Pose',
                     )
                     pose_custom = gr.Textbox(
                         label='Custom Pose',
@@ -445,25 +455,22 @@ def build_ui():
                 # Makeup
                 makeup_options = load_options('influencer_makeup.txt')
                 with gr.Accordion('Makeup', open=False, elem_classes=['dimension-section']):
-                    makeup = gr.Dropdown(
-                        label='Select Makeup', choices=makeup_options,
-                        value=NONE_OPTION, interactive=True,
+                    makeup_picker_html, makeup = build_visual_picker(
+                        'influencer_makeup', makeup_options, label='Select Makeup',
                     )
 
                 # Expression
                 expression_options = load_options('influencer_expressions.txt')
                 with gr.Accordion('Expression', open=False, elem_classes=['dimension-section']):
-                    expression = gr.Dropdown(
-                        label='Select Expression', choices=expression_options,
-                        value=NONE_OPTION, interactive=True,
+                    expression_picker_html, expression = build_visual_picker(
+                        'influencer_expressions', expression_options, label='Select Expression',
                     )
 
                 # Background
                 bg_options = load_options('influencer_settings.txt')
                 with gr.Accordion('Background', open=False, elem_classes=['dimension-section']):
-                    background = gr.Dropdown(
-                        label='Select Background', choices=bg_options,
-                        value=NONE_OPTION, interactive=True,
+                    bg_picker_html, background = build_visual_picker(
+                        'influencer_settings', bg_options, label='Select Background',
                     )
                     background_custom = gr.Textbox(
                         label='Custom Background',
@@ -474,9 +481,8 @@ def build_ui():
                 # Lighting
                 lighting_options = load_options('influencer_lighting.txt')
                 with gr.Accordion('Lighting', open=False, elem_classes=['dimension-section']):
-                    lighting = gr.Dropdown(
-                        label='Select Lighting', choices=lighting_options,
-                        value=NONE_OPTION, interactive=True,
+                    lighting_picker_html, lighting = build_visual_picker(
+                        'influencer_lighting', lighting_options, label='Select Lighting',
                     )
 
                 # Camera Angle
@@ -539,6 +545,52 @@ def build_ui():
                         refresh_files_clicked, outputs=[pro_base_model],
                         queue=False, show_progress='hidden',
                     )
+
+                # Metadata / EXIF Settings
+                with gr.Accordion('Metadata / EXIF', open=False, elem_classes=['dimension-section']):
+                    from modules.metadata_spoof import list_camera_profiles
+                    from modules import private_logger
+
+                    meta_enabled = gr.Checkbox(
+                        label='Spoof Camera EXIF (strip AI markers)',
+                        value=private_logger.spoof_enabled,
+                    )
+                    meta_camera = gr.Dropdown(
+                        label='Camera Profile',
+                        choices=list_camera_profiles(),
+                        value=private_logger.spoof_camera_profile,
+                        interactive=True,
+                    )
+                    meta_photographer = gr.Textbox(
+                        label='Photographer Name (optional)',
+                        placeholder='e.g. @yourhandle',
+                        lines=1, max_lines=1,
+                    )
+                    meta_gps_enabled = gr.Checkbox(label='Embed GPS location', value=False)
+                    with gr.Row():
+                        meta_gps_lat = gr.Number(label='Latitude', value=0.0, visible=False)
+                        meta_gps_lon = gr.Number(label='Longitude', value=0.0, visible=False)
+
+                    meta_gps_enabled.change(
+                        lambda v: (gr.update(visible=v), gr.update(visible=v)),
+                        inputs=[meta_gps_enabled],
+                        outputs=[meta_gps_lat, meta_gps_lon],
+                        queue=False, show_progress='hidden',
+                    )
+
+                    def _apply_meta_settings(enabled, camera, photographer, gps_on, lat, lon):
+                        private_logger.spoof_enabled = enabled
+                        private_logger.spoof_camera_profile = camera
+                        private_logger.spoof_photographer = photographer if photographer and photographer.strip() else None
+                        private_logger.spoof_gps_coords = (lat, lon) if gps_on else None
+
+                    for comp in [meta_enabled, meta_camera, meta_photographer, meta_gps_enabled, meta_gps_lat, meta_gps_lon]:
+                        comp.change(
+                            _apply_meta_settings,
+                            inputs=[meta_enabled, meta_camera, meta_photographer, meta_gps_enabled, meta_gps_lat, meta_gps_lon],
+                            outputs=[],
+                            queue=False, show_progress='hidden',
+                        )
 
                 # VRAM Monitor
                 create_vram_indicator()
@@ -716,6 +768,7 @@ def build_ui():
             background, background_custom,
             lighting, camera_angle, footwear, custom_prompt,
             face_image_1, face_image_2, face_image_3,
+            face_swap_enabled,
             pro_enabled, pro_base_model, image_seed, pro_resolution,
         ]
 
@@ -727,6 +780,7 @@ def build_ui():
             bg, bg_c,
             lt, ca, fw, cp,
             fi1, fi2, fi3,
+            fs_on,
             pro_en, pro_bm, pro_seed, pro_res,
         ):
             params, seed = _build_task_params(
@@ -739,6 +793,7 @@ def build_ui():
                 lighting=lt, camera_angle=ca, footwear=fw,
                 custom_prompt=cp,
                 face_image_1=fi1, face_image_2=fi2, face_image_3=fi3,
+                face_swap_on=fs_on,
                 pro_enabled=pro_en, pro_base_model=pro_bm,
                 pro_seed_override=pro_seed, pro_resolution=pro_res,
             )
@@ -790,6 +845,33 @@ def build_ui():
     return shared.gradio_root
 
 
+def _start_cloudflared_tunnel(port=7865):
+    """Start a cloudflared quick tunnel as a backup to Gradio share."""
+    import subprocess
+    import re
+    import threading
+    import shutil
+
+    if shutil.which('cloudflared') is None:
+        print('[Tunnel] cloudflared not found. Install it or use --tunnel gradio.')
+        return None
+
+    proc = subprocess.Popen(
+        ['cloudflared', 'tunnel', '--url', f'http://localhost:{port}'],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+
+    def _read_url():
+        for line in proc.stderr:
+            m = re.search(r'https://[a-z0-9-]+\.trycloudflare\.com', line)
+            if m:
+                print(f'\n[Tunnel] Cloudflared public URL: {m.group(0)}\n')
+                break
+
+    threading.Thread(target=_read_url, daemon=True).start()
+    return proc
+
+
 def launch_app():
     """Build and launch the Freyra app."""
     app = build_ui()
@@ -797,11 +879,14 @@ def launch_app():
     from modules.api import api_app
     app.app.mount("/api/v1", api_app)
 
+    tunnel_mode = getattr(args_manager.args, 'tunnel', 'gradio')
+    use_gradio_share = args_manager.args.share and tunnel_mode in ('gradio', 'both')
+
     app.launch(
         inbrowser=args_manager.args.in_browser,
         server_name=args_manager.args.listen,
         server_port=args_manager.args.port,
-        share=args_manager.args.share,
+        share=use_gradio_share,
         auth=check_auth if (args_manager.args.share or args_manager.args.listen) and auth_enabled else None,
         allowed_paths=[
             modules.config.path_outputs,
@@ -813,3 +898,7 @@ def launch_app():
         ],
         blocked_paths=[constants.AUTH_FILENAME],
     )
+
+    if args_manager.args.share and tunnel_mode in ('cloudflared', 'both'):
+        port = args_manager.args.port or 7865
+        _start_cloudflared_tunnel(port)

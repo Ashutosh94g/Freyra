@@ -282,10 +282,56 @@ footer {
     100% { transform: rotate(360deg); }
 }
 
+/* ── Visual Picker ── */
+.visual-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 6px;
+    padding: 6px 0;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.picker-card {
+    border: 2px solid #2a2a2a;
+    border-radius: 8px;
+    padding: 10px 8px;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: #1e1e1e;
+    user-select: none;
+}
+
+.picker-card:hover {
+    border-color: #c4852e;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(196, 133, 46, 0.2);
+}
+
+.picker-card.selected {
+    border-color: #c4852e;
+    box-shadow: 0 0 0 2px rgba(196, 133, 46, 0.4), 0 2px 8px rgba(196, 133, 46, 0.3);
+}
+
+.picker-card-label {
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.3;
+    word-break: break-word;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .freyra-header h1 {
         font-size: 22px;
+    }
+    .visual-picker-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
     }
 }
 """

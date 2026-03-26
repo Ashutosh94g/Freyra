@@ -103,8 +103,65 @@ CAMERA_PROFILES = {
         "ExposureTime_options": [
             (1, 60), (1, 125), (1, 250), (1, 500), (1, 1000), (1, 2000)
         ],
-        "ExposureProgram": 3,   # Aperture priority
-        "MeteringMode": 2,      # Center weighted
+        "ExposureProgram": 3,
+        "MeteringMode": 2,
+        "Flash": 0,
+        "WhiteBalance": 0,
+        "ColorSpace": 1,
+    },
+    "Google Pixel 9 Pro": {
+        "Make": "Google",
+        "Model": "Pixel 9 Pro",
+        "Software": "Pixel Camera 9.5.100",
+        "LensMake": "Google",
+        "LensModel": "Pixel 9 Pro back camera 6.81mm f/1.68",
+        "FocalLength": (6810, 1000),
+        "FocalLengthIn35mmFilm": 24,
+        "FNumber_options": [(168, 100), (195, 100), (280, 100)],
+        "ISOSpeedRatings_options": [50, 73, 100, 200, 400, 800],
+        "ExposureTime_options": [
+            (1, 60), (1, 120), (1, 250), (1, 500), (1, 1000), (1, 4000)
+        ],
+        "ExposureProgram": 2,
+        "MeteringMode": 5,
+        "Flash": 16,
+        "WhiteBalance": 0,
+        "ColorSpace": 65535,
+    },
+    "Nikon Z8": {
+        "Make": "NIKON CORPORATION",
+        "Model": "NIKON Z 8",
+        "Software": "Ver.02.01",
+        "LensMake": "NIKON",
+        "LensModel": "NIKKOR Z 85mm f/1.2 S",
+        "FocalLength": (85000, 1000),
+        "FocalLengthIn35mmFilm": 85,
+        "FNumber_options": [(120, 100), (140, 100), (180, 100), (200, 100), (280, 100)],
+        "ISOSpeedRatings_options": [64, 100, 200, 400, 800],
+        "ExposureTime_options": [
+            (1, 60), (1, 125), (1, 250), (1, 500), (1, 1000), (1, 2000), (1, 4000)
+        ],
+        "ExposureProgram": 3,
+        "MeteringMode": 5,
+        "Flash": 0,
+        "WhiteBalance": 0,
+        "ColorSpace": 1,
+    },
+    "Fujifilm X-T5": {
+        "Make": "FUJIFILM",
+        "Model": "X-T5",
+        "Software": "Digital Camera X-T5 Ver3.01",
+        "LensMake": "FUJIFILM",
+        "LensModel": "XF56mmF1.2 R WR",
+        "FocalLength": (56000, 1000),
+        "FocalLengthIn35mmFilm": 84,
+        "FNumber_options": [(120, 100), (160, 100), (200, 100), (280, 100), (400, 100)],
+        "ISOSpeedRatings_options": [125, 200, 400, 800, 1600],
+        "ExposureTime_options": [
+            (1, 60), (1, 125), (1, 250), (1, 500), (1, 1000), (1, 2000)
+        ],
+        "ExposureProgram": 3,
+        "MeteringMode": 5,
         "Flash": 0,
         "WhiteBalance": 0,
         "ColorSpace": 1,
@@ -260,6 +317,59 @@ def apply_camera_exif(
         return piexif.dump(exif_dict)
     except Exception:
         return b""
+
+
+def strip_ai_markers(img_bytes: bytes) -> bytes:
+    """Strip known AI-generation markers from image bytes.
+
+    Removes PNG tEXt/iTXt chunks containing 'parameters', 'fooocus',
+    'comfy', 'workflow', 'prompt', and C2PA content credential markers.
+    Works on PNG only; JPEG/WEBP markers are handled by piexif overwrite.
+    """
+    if len(img_bytes) < 8:
+        return img_bytes
+
+    PNG_SIG = b'\x89PNG\r\n\x1a\n'
+    if img_bytes[:8] != PNG_SIG:
+        return img_bytes
+
+    AI_KEYWORDS = {b'parameters', b'fooocus', b'comfy', b'workflow',
+                   b'prompt', b'sd-metadata', b'ai', b'generation'}
+    STRIP_CHUNK_TYPES = {b'tEXt', b'iTXt', b'zTXt'}
+    C2PA_MARKER = b'c2pa'
+
+    clean = bytearray(PNG_SIG)
+    pos = 8
+    while pos < len(img_bytes):
+        if pos + 8 > len(img_bytes):
+            break
+        length = int.from_bytes(img_bytes[pos:pos + 4], 'big')
+        chunk_type = img_bytes[pos + 4:pos + 8]
+        chunk_end = pos + 12 + length  # 4 len + 4 type + data + 4 crc
+
+        if chunk_end > len(img_bytes):
+            clean.extend(img_bytes[pos:])
+            break
+
+        chunk_data = img_bytes[pos + 8:pos + 8 + length]
+        skip = False
+
+        if chunk_type in STRIP_CHUNK_TYPES:
+            data_lower = chunk_data.lower()
+            for kw in AI_KEYWORDS:
+                if kw in data_lower:
+                    skip = True
+                    break
+
+        if C2PA_MARKER in chunk_type.lower():
+            skip = True
+
+        if not skip:
+            clean.extend(img_bytes[pos:chunk_end])
+
+        pos = chunk_end
+
+    return bytes(clean)
 
 
 def is_available() -> bool:

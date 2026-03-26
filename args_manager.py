@@ -40,6 +40,10 @@ args_parser.parser.add_argument("--always-download-new-model", action='store_tru
 args_parser.parser.add_argument("--rebuild-hash-cache", help="Generates missing model and LoRA hashes.",
                                 type=int, nargs="?", metavar="CPU_NUM_THREADS", const=-1)
 
+args_parser.parser.add_argument("--tunnel", type=str, default='gradio',
+                                choices=['gradio', 'cloudflared', 'both'],
+                                help="Tunnel method for public URL: gradio (default), cloudflared, or both.")
+
 # --- Phase 5: Generation default overrides via CLI ---
 args_parser.parser.add_argument("--default-prompt", type=str, default=None,
                                 help="Override default prompt text.")
