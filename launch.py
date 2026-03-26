@@ -215,16 +215,23 @@ config.default_base_model_name, config.checkpoint_downloads = download_models(
 config.update_files()
 init_cache(config.model_filenames, config.paths_checkpoints, config.lora_filenames, config.paths_loras)
 
-# Download InsightFace inswapper model for face swap
+# Download InsightFace inswapper model for face swap (non-fatal)
 inswapper_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models', 'insightface')
 os.makedirs(inswapper_dir, exist_ok=True)
 inswapper_path = os.path.join(inswapper_dir, 'inswapper_128.onnx')
 if not os.path.isfile(inswapper_path):
-    load_file_from_url(
-        url='https://huggingface.co/deepinsight/inswapper/resolve/main/inswapper_128.onnx',
-        model_dir=inswapper_dir,
-        file_name='inswapper_128.onnx',
-    )
+    _inswapper_urls = [
+        'https://huggingface.co/ezioruan/inswapper_128.onnx/resolve/main/inswapper_128.onnx',
+        'https://huggingface.co/thebiglaskowski/inswapper_128.onnx/resolve/main/inswapper_128.onnx',
+    ]
+    for _url in _inswapper_urls:
+        try:
+            load_file_from_url(url=_url, model_dir=inswapper_dir, file_name='inswapper_128.onnx')
+            break
+        except Exception as _e:
+            print(f'[FaceSwap] Download failed from {_url}: {_e}')
+    else:
+        print('[FaceSwap] Could not download inswapper_128.onnx -- face swap will be disabled.')
 
 from ui.app import launch_app
 launch_app()
