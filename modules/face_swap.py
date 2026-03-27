@@ -489,8 +489,16 @@ def swap_face(
 ) -> np.ndarray | None:
     """Swap the face from source_img onto target_img.
 
-    Each enhancement step is individually protected -- if it fails the
-    pipeline continues with the result from the previous successful step.
+    The pipeline is:
+      1. Detect faces in source and target
+      2. Multi-pass inswapper (2 passes to reinforce identity)
+      3. Optional luminance matching (LAB L-channel only)
+      4. Optional GFPGAN face restoration
+
+    The inswapper already handles its own blending via an internal mask
+    built from the warped face template + 106-point landmarks + pixel
+    difference thresholding. We do NOT apply a second blend pass on top
+    because that erases the swap from the outer face region.
 
     Parameters
     ----------
@@ -499,15 +507,13 @@ def swap_face(
     target_img : np.ndarray
         Image to receive the face (RGB, HWC).
     enhance_blend : bool
-        Legacy parameter. When True and enhanced_blending is False, uses
-        Gaussian feathering. Kept for backward compatibility.
+        Legacy parameter kept for backward compatibility.
     color_match : bool
-        Match swapped face color/lighting to the target face region.
+        Match swapped face lighting to the target scene.
     face_restore : bool
         Apply GFPGAN face restoration after swapping.
     enhanced_blending : bool
-        Use face-parsing mask + soft alpha blending instead of
-        basic Gaussian feathering.
+        When True, enables multi-pass swap for stronger identity.
 
     Returns
     -------
@@ -534,6 +540,11 @@ def swap_face(
         print(f'[FaceSwap] Color conversion failed: {e}')
         return None
 
+    # Keep a pristine copy -- swapper returns a new array but we need
+    # the original for color matching reference.
+    original_bgr = tgt_bgr.copy()
+    h, w = tgt_bgr.shape[:2]
+
     # -- Step 1: detect faces (with robust fallbacks for close-ups) --
     try:
         src_faces = _detect_face_robust(analyser, src_bgr)
@@ -546,72 +557,67 @@ def swap_face(
     target_face = _get_largest_face(tgt_faces)
 
     if source_face is None:
-        print(f'[FaceSwap] No face detected in source image ({source_img.shape[1]}x{source_img.shape[0]})')
+        print(f'[FaceSwap] No face detected in source image '
+              f'({source_img.shape[1]}x{source_img.shape[0]})')
         return None
     if target_face is None:
-        print(f'[FaceSwap] No face detected in target image ({target_img.shape[1]}x{target_img.shape[0]})')
+        print(f'[FaceSwap] No face detected in target image '
+              f'({target_img.shape[1]}x{target_img.shape[0]})')
         return None
 
-    print(f'[FaceSwap] Source face bbox: {source_face.bbox.astype(int).tolist()}')
-    print(f'[FaceSwap] Target face bbox: {target_face.bbox.astype(int).tolist()}')
+    # Log face info and embedding health
+    src_emb = getattr(source_face, 'normed_embedding', None)
+    emb_status = 'MISSING'
+    if src_emb is not None:
+        emb_status = f'OK  norm={np.linalg.norm(src_emb):.3f}'
+    print(f'[FaceSwap] Source face bbox: {source_face.bbox.astype(int).tolist()}'
+          f'  embedding: {emb_status}')
+    has_106 = hasattr(target_face, 'landmark_2d_106') and target_face.landmark_2d_106 is not None
+    print(f'[FaceSwap] Target face bbox: {target_face.bbox.astype(int).tolist()}'
+          f'  has_106lm: {has_106}')
 
-    # -- Step 2: core InsightFace swap (must succeed) --
-    h, w = tgt_bgr.shape[:2]
-    try:
-        result_bgr = swapper.get(tgt_bgr, target_face, source_face, paste_back=True)
-        diff = np.abs(result_bgr.astype(float) - tgt_bgr.astype(float))
-        bbox = target_face.bbox.astype(int)
-        bx1, by1 = max(0, bbox[0]), max(0, bbox[1])
-        bx2, by2 = min(w, bbox[2]), min(h, bbox[3])
-        face_diff = diff[by1:by2, bx1:bx2]
-        print(f'[FaceSwap] Core swap successful - '
-              f'face region delta: mean={face_diff.mean():.1f}, '
-              f'max={face_diff.max():.1f}, '
-              f'changed_px={np.sum(face_diff.max(axis=2) > 10)}')
-    except Exception as e:
-        print(f'[FaceSwap] Core swap failed: {e}')
-        return None
+    # -- Step 2: multi-pass inswapper for stronger identity transfer --
+    num_passes = 2 if enhanced_blending else 1
+    result_bgr = tgt_bgr.copy()
 
-    # -- Step 3: enhanced blending (each sub-step individually protected) --
-
-    if enhanced_blending:
-        # 3a. Build the blend mask (face parsing or bbox fallback)
-        blend_mask = None
+    for pass_idx in range(num_passes):
         try:
-            blend_mask = _get_face_parse_mask(result_bgr, target_face.bbox)
-            if blend_mask is not None:
-                print('[FaceSwap] Face parsing mask generated')
+            if pass_idx == 0:
+                current_target = target_face
+            else:
+                # Re-detect face in the intermediate result so the
+                # inswapper aligns to the already-partially-swapped face.
+                redet = analyser.get(result_bgr)
+                current_target = _get_largest_face(redet) if redet else target_face
+
+            result_bgr = swapper.get(
+                result_bgr, current_target, source_face, paste_back=True,
+            )
+            # Measure how much this pass changed
+            diff = np.abs(result_bgr.astype(float) - original_bgr.astype(float))
+            bbox = target_face.bbox.astype(int)
+            bx1, by1 = max(0, bbox[0]), max(0, bbox[1])
+            bx2, by2 = min(w, bbox[2]), min(h, bbox[3])
+            face_diff = diff[by1:by2, bx1:bx2]
+            print(f'[FaceSwap] Pass {pass_idx + 1}/{num_passes} - '
+                  f'face delta vs original: mean={face_diff.mean():.1f}, '
+                  f'max={face_diff.max():.1f}, '
+                  f'changed_px={np.sum(face_diff.max(axis=2) > 10)}')
         except Exception as e:
-            print(f'[FaceSwap] Face parsing failed (continuing with bbox mask): {e}')
+            print(f'[FaceSwap] Pass {pass_idx + 1} failed: {e}')
+            if pass_idx == 0:
+                return None
 
-        if blend_mask is None:
-            blend_mask = _make_bbox_mask(h, w, target_face.bbox)
-            print('[FaceSwap] Using elliptical bbox mask as fallback')
-
-        # 3b. Color matching (subtle)
-        if color_match:
-            try:
-                result_bgr = _match_face_color(result_bgr, tgt_bgr, blend_mask)
-                print('[FaceSwap] Color matching applied')
-            except Exception as e:
-                print(f'[FaceSwap] Color matching failed (continuing without): {e}')
-
-        # 3c. Soft-mask alpha blend (replaces Poisson seamlessClone)
+    # -- Step 3: luminance matching (optional) --
+    # Only match scene LIGHTING, not color/identity. Uses a generous
+    # bbox mask since this only affects the L channel.
+    if color_match:
         try:
-            result_bgr = _soft_mask_blend(result_bgr, tgt_bgr, blend_mask)
-            print('[FaceSwap] Soft-mask blending applied')
+            luma_mask = _make_bbox_mask(h, w, target_face.bbox)
+            result_bgr = _match_face_color(result_bgr, original_bgr, luma_mask)
+            print('[FaceSwap] Luminance matching applied')
         except Exception as e:
-            print(f'[FaceSwap] Soft-mask blending failed (using legacy blend): {e}')
-            try:
-                result_bgr = _smooth_face_boundary(result_bgr, tgt_bgr, target_face)
-            except Exception:
-                pass
-
-    elif enhance_blend:
-        try:
-            result_bgr = _smooth_face_boundary(result_bgr, tgt_bgr, target_face)
-        except Exception as e:
-            print(f'[FaceSwap] Basic blending failed (continuing without): {e}')
+            print(f'[FaceSwap] Luminance matching failed (continuing): {e}')
 
     # -- Step 4: GFPGAN face restoration --
     if face_restore:
@@ -619,7 +625,7 @@ def swap_face(
             result_bgr = _restore_face_gfpgan(result_bgr, target_face.bbox)
             print('[FaceSwap] GFPGAN restoration applied')
         except Exception as e:
-            print(f'[FaceSwap] GFPGAN restoration failed (continuing without): {e}')
+            print(f'[FaceSwap] GFPGAN restoration failed (continuing): {e}')
 
     print('[FaceSwap] Pipeline complete')
     return cv2.cvtColor(result_bgr, cv2.COLOR_BGR2RGB)

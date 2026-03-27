@@ -149,9 +149,9 @@ def build_face_swap_tab():
                     info='Restore facial details after swap (downloads ~340MB model on first use)',
                 )
                 do_enhanced_blending = gr.Checkbox(
-                    label='Enhanced Blending',
+                    label='Multi-Pass Swap',
                     value=True,
-                    info='Face-parsing mask + soft alpha blend (downloads ~30MB parsing model on first use)',
+                    info='Run 2-pass swap for stronger identity transfer',
                 )
 
     with gr.Row():
