@@ -1,8 +1,8 @@
 """Freyra Face Swap Studio -- swap your character's face onto any image.
 
-Supports fetching target images from Instagram post URLs or direct upload.
-Uses the enhanced face swap pipeline with parsing masks, color matching,
-Poisson blending, and GFPGAN restoration.
+Supports fetching target images from Instagram post URLs, direct image URLs,
+or manual upload. Uses the enhanced face swap pipeline with parsing masks,
+color matching, Poisson blending, and GFPGAN restoration.
 """
 
 import numpy as np
@@ -11,19 +11,13 @@ import gradio as gr
 from modules.character_profiles import list_profile_names, load_profile
 
 
-def _fetch_ig_image(url: str):
-    """Fetch an image from an Instagram post URL."""
+def _fetch_url_image(url: str):
+    """Fetch an image from an Instagram post URL or direct image URL."""
     if not url or not url.strip():
-        return None, 'Please enter an Instagram post URL.'
+        return None, 'Please enter a URL.'
 
-    from modules.instagram_fetcher import is_instagram_url, fetch_instagram_image
-
-    if not is_instagram_url(url):
-        return None, ('Not a valid Instagram URL. '
-                      'Expected format: https://www.instagram.com/p/XXXXX/ '
-                      'or /reel/XXXXX/')
-
-    image, message = fetch_instagram_image(url)
+    from modules.instagram_fetcher import fetch_image_from_url
+    image, message = fetch_image_from_url(url)
     return image, message
 
 
@@ -46,7 +40,7 @@ def _run_face_swap(
 ):
     """Execute the face swap pipeline."""
     if target_image is None:
-        return None, 'No target image. Upload one or fetch from Instagram.'
+        return None, 'No target image. Upload one or fetch from a URL.'
 
     face_refs = [f for f in [face_1, face_2, face_3] if f is not None]
     if not face_refs:
@@ -70,9 +64,12 @@ def _run_face_swap(
     )
 
     if result is None:
-        return None, 'Face swap failed. Could not detect faces in one or both images.'
+        return None, (
+            'Face swap failed. Check the terminal logs for details. '
+            'Common causes: no face detected in source or target image.'
+        )
 
-    return result, 'Face swap completed successfully.'
+    return result, 'Face swap completed successfully!'
 
 
 def build_face_swap_tab():
@@ -83,7 +80,7 @@ def build_face_swap_tab():
     gr.Markdown('### Face Swap Studio')
     gr.Markdown(
         'Swap your character\'s face onto any photo. '
-        'Paste an Instagram post link or upload a target image directly.'
+        'Paste an Instagram link, a direct image URL, or upload a target image.'
     )
 
     with gr.Row():
@@ -91,18 +88,18 @@ def build_face_swap_tab():
         with gr.Column(scale=1):
             gr.Markdown('**Target Image**')
 
-            ig_url = gr.Textbox(
-                label='Instagram Post URL',
-                placeholder='https://www.instagram.com/p/XXXXX/',
+            url_input = gr.Textbox(
+                label='Image URL',
+                placeholder='Instagram post URL or direct image URL (jpg/png)',
                 lines=1, max_lines=1,
             )
-            ig_fetch_btn = gr.Button(
-                'Fetch from Instagram',
+            fetch_btn = gr.Button(
+                'Fetch Image',
                 variant='secondary', size='sm',
             )
-            ig_status = gr.Textbox(
+            fetch_status = gr.Textbox(
                 label='Status', interactive=False,
-                lines=1, max_lines=2, visible=True,
+                lines=1, max_lines=4, visible=True,
             )
 
             gr.Markdown('**-- or upload directly --**')
@@ -149,12 +146,12 @@ def build_face_swap_tab():
                 do_face_restore = gr.Checkbox(
                     label='Face Restoration (GFPGAN)',
                     value=True,
-                    info='Restore facial details after swap',
+                    info='Restore facial details after swap (downloads ~340MB model on first use)',
                 )
                 do_enhanced_blending = gr.Checkbox(
                     label='Enhanced Blending',
                     value=True,
-                    info='Face-parsing mask + Poisson seamless clone',
+                    info='Face-parsing mask + Poisson seamless clone (downloads ~30MB model on first use)',
                 )
 
     with gr.Row():
@@ -166,7 +163,7 @@ def build_face_swap_tab():
         )
         swap_status = gr.Textbox(
             label='Result', interactive=False,
-            lines=1, max_lines=2, scale=3,
+            lines=1, max_lines=3, scale=3,
         )
 
     result_image = gr.Image(
@@ -175,10 +172,10 @@ def build_face_swap_tab():
     )
 
     # -- Wire events --
-    ig_fetch_btn.click(
-        fn=_fetch_ig_image,
-        inputs=[ig_url],
-        outputs=[target_image, ig_status],
+    fetch_btn.click(
+        fn=_fetch_url_image,
+        inputs=[url_input],
+        outputs=[target_image, fetch_status],
         show_progress='full',
     )
 
@@ -201,9 +198,9 @@ def build_face_swap_tab():
     )
 
     return {
-        'ig_url': ig_url,
-        'ig_fetch_btn': ig_fetch_btn,
-        'ig_status': ig_status,
+        'url_input': url_input,
+        'fetch_btn': fetch_btn,
+        'fetch_status': fetch_status,
         'target_image': target_image,
         'character': character_select,
         'face_1': swap_face_1,

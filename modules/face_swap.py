@@ -3,6 +3,9 @@
 Pipeline: source face + target image -> detect -> swap -> parse mask ->
           color match -> seamless blend -> GFPGAN restore.
 
+Each enhanced step is individually protected: if it fails, the pipeline
+continues with the result from the previous step instead of returning None.
+
 All processing runs on CPU to preserve GPU VRAM for diffusion.
 
 Requires: insightface>=0.7.3, onnxruntime>=1.16.0
@@ -176,6 +179,9 @@ def _match_face_color(swapped_bgr: np.ndarray, original_bgr: np.ndarray,
 
     Uses per-channel mean/std transfer within the masked face region.
     """
+    if mask is None:
+        return swapped_bgr
+
     mask_bool = mask > 0.5
     if not np.any(mask_bool):
         return swapped_bgr
@@ -195,7 +201,6 @@ def _match_face_color(swapped_bgr: np.ndarray, original_bgr: np.ndarray,
         blend_factor = 0.6
         blended = result[:, :, c] * (1 - blend_factor) + transferred * blend_factor
 
-        mask_float = mask[:, :, np.newaxis] if mask.ndim < 3 else mask
         result[:, :, c] = np.where(mask_bool, blended, result[:, :, c])
 
     return np.clip(result, 0, 255).astype(np.uint8)
@@ -213,20 +218,34 @@ def _seamless_blend(swapped_bgr: np.ndarray, original_bgr: np.ndarray,
     """
     h, w = original_bgr.shape[:2]
     bbox = face_bbox.astype(int)
-    cx = int((bbox[0] + bbox[2]) / 2)
-    cy = int((bbox[1] + bbox[3]) / 2)
+    x1 = max(0, int(bbox[0]))
+    y1 = max(0, int(bbox[1]))
+    x2 = min(w, int(bbox[2]))
+    y2 = min(h, int(bbox[3]))
+
+    cx = (x1 + x2) // 2
+    cy = (y1 + y2) // 2
     cx = max(1, min(w - 2, cx))
     cy = max(1, min(h - 2, cy))
 
-    if parse_mask is not None:
+    if parse_mask is not None and np.any(parse_mask > 0.1):
         mask_uint8 = (parse_mask * 255).astype(np.uint8)
     else:
         mask_uint8 = np.zeros((h, w), dtype=np.uint8)
-        x1 = max(0, bbox[0])
-        y1 = max(0, bbox[1])
-        x2 = min(w, bbox[2])
-        y2 = min(h, bbox[3])
-        mask_uint8[y1:y2, x1:x2] = 255
+        pad = int(min(x2 - x1, y2 - y1) * 0.05)
+        mx1 = max(0, x1 + pad)
+        my1 = max(0, y1 + pad)
+        mx2 = min(w, x2 - pad)
+        my2 = min(h, y2 - pad)
+        if mx2 > mx1 and my2 > my1:
+            cv2.ellipse(
+                mask_uint8,
+                ((mx1 + mx2) // 2, (my1 + my2) // 2),
+                ((mx2 - mx1) // 2, (my2 - my1) // 2),
+                0, 0, 360, 255, -1
+            )
+        else:
+            mask_uint8[y1:y2, x1:x2] = 255
 
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
     mask_uint8 = cv2.dilate(mask_uint8, kernel, iterations=1)
@@ -240,7 +259,8 @@ def _seamless_blend(swapped_bgr: np.ndarray, original_bgr: np.ndarray,
             (cx, cy), cv2.NORMAL_CLONE
         )
         return result
-    except Exception:
+    except Exception as e:
+        print(f'[FaceSwap] seamlessClone failed ({e}), using feather blend')
         return _fallback_feather_blend(swapped_bgr, original_bgr, mask_uint8)
 
 
@@ -321,7 +341,8 @@ def _load_gfpgan():
     try:
         from ldm_patched.pfn.architecture.face.gfpganv1_clean_arch import GFPGANv1Clean
 
-        state_dict = torch.load(model_path, map_location='cpu', weights_only=True)
+        # GFPGAN checkpoints use pickle-serialized objects; weights_only must be False
+        state_dict = torch.load(model_path, map_location='cpu', weights_only=False)
         if 'params_ema' in state_dict:
             state_dict = state_dict['params_ema']
         elif 'params' in state_dict:
@@ -342,6 +363,7 @@ def _restore_face_gfpgan(image_bgr: np.ndarray, face_bbox: np.ndarray) -> np.nda
     """Apply GFPGAN face restoration to the face region in the image.
 
     Crops the face, runs GFPGAN at 512x512, and pastes back.
+    Returns the original image unchanged if restoration fails.
     """
     model = _load_gfpgan()
     if model is None:
@@ -364,6 +386,7 @@ def _restore_face_gfpgan(image_bgr: np.ndarray, face_bbox: np.ndarray) -> np.nda
     crop_h, crop_w = face_crop.shape[:2]
 
     face_input = cv2.resize(face_crop, (512, 512), interpolation=cv2.INTER_LINEAR)
+    # GFPGAN expects BGR input normalized to [-1, 1]
     face_input = face_input.astype(np.float32) / 255.0
     face_input = (face_input - 0.5) / 0.5
 
@@ -383,10 +406,9 @@ def _restore_face_gfpgan(image_bgr: np.ndarray, face_bbox: np.ndarray) -> np.nda
     restored_face = cv2.resize(restored_face, (crop_w, crop_h),
                                interpolation=cv2.INTER_LANCZOS4)
 
-    # Blend restored face back using a soft elliptical mask
     blend_mask = np.zeros((crop_h, crop_w), dtype=np.float32)
     center = (crop_w // 2, crop_h // 2)
-    axes = (int(crop_w * 0.38), int(crop_h * 0.42))
+    axes = (max(1, int(crop_w * 0.38)), max(1, int(crop_h * 0.42)))
     cv2.ellipse(blend_mask, center, axes, 0, 0, 360, 1.0, -1)
     blend_mask = cv2.GaussianBlur(blend_mask, (31, 31), 0)
     blend_mask_3ch = blend_mask[:, :, np.newaxis]
@@ -413,6 +435,9 @@ def swap_face(
 ) -> np.ndarray | None:
     """Swap the face from source_img onto target_img.
 
+    Each enhancement step is individually protected -- if it fails the
+    pipeline continues with the result from the previous successful step.
+
     Parameters
     ----------
     source_img : np.ndarray
@@ -433,52 +458,96 @@ def swap_face(
     Returns
     -------
     np.ndarray or None
-        Modified target with swapped face, or None on failure.
+        Modified target with swapped face, or None only if face detection
+        or the core swap itself fails.
     """
     if not is_available():
+        print('[FaceSwap] Not available: missing insightface/onnxruntime or inswapper model')
         return None
 
+    # -- Step 0: detect faces --
     try:
         analyser = get_face_analyser()
         swapper = get_face_swapper()
+    except Exception as e:
+        print(f'[FaceSwap] Failed to load models: {e}')
+        return None
 
+    try:
         src_bgr = cv2.cvtColor(source_img, cv2.COLOR_RGB2BGR)
         tgt_bgr = cv2.cvtColor(target_img, cv2.COLOR_RGB2BGR)
+    except Exception as e:
+        print(f'[FaceSwap] Color conversion failed: {e}')
+        return None
 
+    try:
         src_faces = analyser.get(src_bgr)
         tgt_faces = analyser.get(tgt_bgr)
-
-        source_face = _get_largest_face(src_faces)
-        target_face = _get_largest_face(tgt_faces)
-
-        if source_face is None or target_face is None:
-            return None
-
-        # Step 1: InsightFace swap
-        result_bgr = swapper.get(tgt_bgr, target_face, source_face, paste_back=True)
-
-        # Step 2-5: Enhanced pipeline
-        if enhanced_blending:
-            parse_mask = _get_face_parse_mask(result_bgr, target_face.bbox)
-
-            if color_match:
-                result_bgr = _match_face_color(result_bgr, tgt_bgr, parse_mask
-                                               if parse_mask is not None
-                                               else np.zeros(tgt_bgr.shape[:2], dtype=np.float32))
-
-            result_bgr = _seamless_blend(result_bgr, tgt_bgr, target_face.bbox, parse_mask)
-        elif enhance_blend:
-            result_bgr = _smooth_face_boundary(result_bgr, tgt_bgr, target_face)
-
-        # Step 6: GFPGAN restoration
-        if face_restore:
-            result_bgr = _restore_face_gfpgan(result_bgr, target_face.bbox)
-
-        return cv2.cvtColor(result_bgr, cv2.COLOR_BGR2RGB)
-
     except Exception as e:
-        print(f'[FaceSwap] Error: {e}')
+        print(f'[FaceSwap] Face detection failed: {e}')
         return None
+
+    source_face = _get_largest_face(src_faces)
+    target_face = _get_largest_face(tgt_faces)
+
+    if source_face is None:
+        print('[FaceSwap] No face detected in source/reference image')
+        return None
+    if target_face is None:
+        print('[FaceSwap] No face detected in target image')
+        return None
+
+    # -- Step 1: core swap (must succeed) --
+    try:
+        result_bgr = swapper.get(tgt_bgr, target_face, source_face, paste_back=True)
+        print('[FaceSwap] Core swap successful')
+    except Exception as e:
+        print(f'[FaceSwap] Core swap failed: {e}')
+        return None
+
+    # -- Step 2: enhanced blending (each sub-step individually protected) --
+    if enhanced_blending:
+        parse_mask = None
+        try:
+            parse_mask = _get_face_parse_mask(result_bgr, target_face.bbox)
+            if parse_mask is not None:
+                print('[FaceSwap] Face parsing mask generated')
+            else:
+                print('[FaceSwap] Face parsing returned None, using bbox fallback')
+        except Exception as e:
+            print(f'[FaceSwap] Face parsing failed (continuing without): {e}')
+
+        if color_match:
+            try:
+                result_bgr = _match_face_color(result_bgr, tgt_bgr, parse_mask)
+                print('[FaceSwap] Color matching applied')
+            except Exception as e:
+                print(f'[FaceSwap] Color matching failed (continuing without): {e}')
+
+        try:
+            result_bgr = _seamless_blend(result_bgr, tgt_bgr, target_face.bbox, parse_mask)
+            print('[FaceSwap] Seamless blending applied')
+        except Exception as e:
+            print(f'[FaceSwap] Seamless blending failed (using basic blend): {e}')
+            try:
+                result_bgr = _smooth_face_boundary(result_bgr, tgt_bgr, target_face)
+            except Exception:
+                pass
+    elif enhance_blend:
+        try:
+            result_bgr = _smooth_face_boundary(result_bgr, tgt_bgr, target_face)
+        except Exception as e:
+            print(f'[FaceSwap] Basic blending failed (continuing without): {e}')
+
+    # -- Step 3: GFPGAN restoration (individually protected) --
+    if face_restore:
+        try:
+            result_bgr = _restore_face_gfpgan(result_bgr, target_face.bbox)
+            print('[FaceSwap] GFPGAN restoration applied')
+        except Exception as e:
+            print(f'[FaceSwap] GFPGAN restoration failed (continuing without): {e}')
+
+    return cv2.cvtColor(result_bgr, cv2.COLOR_BGR2RGB)
 
 
 def swap_face_batch(
