@@ -223,9 +223,15 @@ def _get_face_parse_mask(image_bgr: np.ndarray, face_bbox: np.ndarray,
         face_mask_crop = cv2.resize(face_mask_512, (x2 - x1, y2 - y1),
                                     interpolation=cv2.INTER_LINEAR)
 
-        # Smooth edges so the blend is gradual
-        blur_size = max(3, int(min(x2 - x1, y2 - y1) * 0.06) | 1)
+        # Feather the EDGES only: dilate first to expand the mask slightly,
+        # then blur. This keeps the face core at 1.0 while creating a
+        # gradual falloff at the boundary.
+        edge_k = max(3, int(min(x2 - x1, y2 - y1) * 0.04) | 1)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (edge_k, edge_k))
+        face_mask_crop = cv2.dilate(face_mask_crop, kernel, iterations=1)
+        blur_size = max(3, int(min(x2 - x1, y2 - y1) * 0.08) | 1)
         face_mask_crop = cv2.GaussianBlur(face_mask_crop, (blur_size, blur_size), 0)
+        face_mask_crop = np.clip(face_mask_crop, 0, 1.0)
 
         full_mask = np.zeros((h, w), dtype=np.float32)
         full_mask[y1:y2, x1:x2] = face_mask_crop
@@ -263,10 +269,11 @@ def _make_bbox_mask(h: int, w: int, face_bbox: np.ndarray) -> np.ndarray:
 
 def _match_face_color(swapped_bgr: np.ndarray, original_bgr: np.ndarray,
                       mask: np.ndarray) -> np.ndarray:
-    """Subtly match the color/lighting of the swapped face to the original.
+    """Match only the LIGHTING of the swapped face to the target environment.
 
-    Uses per-channel mean/std transfer within the masked face region
-    at a conservative blend factor to avoid washing out the swap.
+    Works in LAB color space: transfers only the L (luminance) channel
+    to match the scene lighting, while preserving A and B channels which
+    carry the swapped face's skin tone identity.
     """
     if mask is None:
         return swapped_bgr
@@ -275,25 +282,26 @@ def _match_face_color(swapped_bgr: np.ndarray, original_bgr: np.ndarray,
     if not np.any(mask_bool):
         return swapped_bgr
 
-    result = swapped_bgr.copy().astype(np.float32)
+    swapped_lab = cv2.cvtColor(swapped_bgr, cv2.COLOR_BGR2LAB).astype(np.float32)
+    original_lab = cv2.cvtColor(original_bgr, cv2.COLOR_BGR2LAB).astype(np.float32)
 
-    for c in range(3):
-        src_pixels = result[:, :, c][mask_bool]
-        tgt_pixels = original_bgr[:, :, c][mask_bool].astype(np.float32)
+    # Only transfer L channel (lighting), leave A/B (color/identity) alone
+    src_L = swapped_lab[:, :, 0][mask_bool]
+    tgt_L = original_lab[:, :, 0][mask_bool]
 
-        src_mean, src_std = src_pixels.mean(), max(src_pixels.std(), 1e-6)
-        tgt_mean, tgt_std = tgt_pixels.mean(), max(tgt_pixels.std(), 1e-6)
+    src_mean, src_std = src_L.mean(), max(src_L.std(), 1e-6)
+    tgt_mean, tgt_std = tgt_L.mean(), max(tgt_L.std(), 1e-6)
 
-        normalized = (result[:, :, c] - src_mean) / src_std
-        transferred = normalized * tgt_std + tgt_mean
+    normalized = (swapped_lab[:, :, 0] - src_mean) / src_std
+    transferred = normalized * tgt_std + tgt_mean
 
-        # Conservative factor: enough to fix obvious mismatches, not so much
-        # that it destroys the swapped face identity
-        blend_factor = 0.35
-        blended = result[:, :, c] * (1 - blend_factor) + transferred * blend_factor
-        result[:, :, c] = np.where(mask_bool, blended, result[:, :, c])
+    blend_factor = 0.4
+    blended_L = swapped_lab[:, :, 0] * (1 - blend_factor) + transferred * blend_factor
+    swapped_lab[:, :, 0] = np.where(mask_bool, blended_L, swapped_lab[:, :, 0])
 
-    return np.clip(result, 0, 255).astype(np.uint8)
+    result = cv2.cvtColor(np.clip(swapped_lab, 0, 255).astype(np.uint8),
+                           cv2.COLOR_LAB2BGR)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -304,14 +312,19 @@ def _soft_mask_blend(swapped_bgr: np.ndarray, original_bgr: np.ndarray,
                      mask: np.ndarray) -> np.ndarray:
     """Blend the swapped face into the original using a soft alpha mask.
 
-    This avoids the color-bleeding and ghosting artifacts that
-    cv2.seamlessClone (Poisson blending) produces on angled faces.
-    The mask should already have soft feathered edges.
+    The mask already has feathered edges from parsing/bbox generation.
+    We only do a very light blur to prevent jagged edges, but keep the
+    face core at full opacity so the swap is clearly visible.
     """
-    # Extra feathering pass for smooth transition
-    ksize = max(5, int(min(original_bgr.shape[:2]) * 0.03) | 1)
+    # Very light single-pass blur just to anti-alias mask edges
+    ksize = max(3, int(min(original_bgr.shape[:2]) * 0.008) | 1)
     soft = cv2.GaussianBlur(mask, (ksize, ksize), 0)
-    soft = cv2.GaussianBlur(soft, (ksize, ksize), 0)
+
+    peak = soft.max()
+    if peak > 0:
+        print(f'[FaceSwap] Blend mask: peak={peak:.3f}, '
+              f'mean_face={soft[soft > 0.1].mean():.3f}, '
+              f'coverage={np.sum(soft > 0.5)} px')
 
     mask_3ch = soft[:, :, np.newaxis]
     result = (swapped_bgr.astype(np.float64) * mask_3ch +
@@ -543,15 +556,23 @@ def swap_face(
     print(f'[FaceSwap] Target face bbox: {target_face.bbox.astype(int).tolist()}')
 
     # -- Step 2: core InsightFace swap (must succeed) --
+    h, w = tgt_bgr.shape[:2]
     try:
         result_bgr = swapper.get(tgt_bgr, target_face, source_face, paste_back=True)
-        print('[FaceSwap] Core swap successful')
+        diff = np.abs(result_bgr.astype(float) - tgt_bgr.astype(float))
+        bbox = target_face.bbox.astype(int)
+        bx1, by1 = max(0, bbox[0]), max(0, bbox[1])
+        bx2, by2 = min(w, bbox[2]), min(h, bbox[3])
+        face_diff = diff[by1:by2, bx1:bx2]
+        print(f'[FaceSwap] Core swap successful - '
+              f'face region delta: mean={face_diff.mean():.1f}, '
+              f'max={face_diff.max():.1f}, '
+              f'changed_px={np.sum(face_diff.max(axis=2) > 10)}')
     except Exception as e:
         print(f'[FaceSwap] Core swap failed: {e}')
         return None
 
     # -- Step 3: enhanced blending (each sub-step individually protected) --
-    h, w = tgt_bgr.shape[:2]
 
     if enhanced_blending:
         # 3a. Build the blend mask (face parsing or bbox fallback)

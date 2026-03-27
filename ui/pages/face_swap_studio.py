@@ -151,7 +151,7 @@ def build_face_swap_tab():
                 do_enhanced_blending = gr.Checkbox(
                     label='Enhanced Blending',
                     value=True,
-                    info='Face-parsing mask + Poisson seamless clone (downloads ~30MB model on first use)',
+                    info='Face-parsing mask + soft alpha blend (downloads ~30MB parsing model on first use)',
                 )
 
     with gr.Row():
