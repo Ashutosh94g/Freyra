@@ -1,7 +1,7 @@
 """Freyra Face Swap -- high-quality face replacement pipeline.
 
 Pipeline: source face + target image -> detect -> swap -> parse mask ->
-          color match -> seamless blend -> GFPGAN restore.
+          color match -> soft-mask blend -> GFPGAN restore.
 
 Each enhanced step is individually protected: if it fails, the pipeline
 continues with the result from the previous step instead of returning None.
@@ -90,6 +90,73 @@ def _get_largest_face(faces):
 
 
 # ---------------------------------------------------------------------------
+# Robust face detection with fallbacks for close-ups
+# ---------------------------------------------------------------------------
+
+def _detect_face_robust(analyser, image_bgr: np.ndarray) -> list:
+    """Detect faces with fallbacks for close-up images.
+
+    When the standard detection fails (face fills the entire frame),
+    adds padding around the image and retries at multiple scales.
+    """
+    faces = analyser.get(image_bgr)
+    if faces:
+        return faces
+
+    h, w = image_bgr.shape[:2]
+    print(f'[FaceSwap] No face at default scale ({w}x{h}), trying padded detection...')
+
+    # Strategy 1: pad the image so the face is ~50% of the canvas
+    for pad_ratio in (0.5, 1.0, 1.5):
+        pad_x = int(w * pad_ratio)
+        pad_y = int(h * pad_ratio)
+        padded = cv2.copyMakeBorder(
+            image_bgr, pad_y, pad_y, pad_x, pad_x,
+            cv2.BORDER_CONSTANT, value=(128, 128, 128)
+        )
+        faces = analyser.get(padded)
+        if faces:
+            print(f'[FaceSwap] Found {len(faces)} face(s) with {pad_ratio}x padding')
+            # Shift bboxes and landmarks back to the original coordinate space
+            for face in faces:
+                face.bbox[0] -= pad_x
+                face.bbox[1] -= pad_y
+                face.bbox[2] -= pad_x
+                face.bbox[3] -= pad_y
+                if hasattr(face, 'kps') and face.kps is not None:
+                    face.kps[:, 0] -= pad_x
+                    face.kps[:, 1] -= pad_y
+                if hasattr(face, 'landmark_2d_106') and face.landmark_2d_106 is not None:
+                    face.landmark_2d_106[:, 0] -= pad_x
+                    face.landmark_2d_106[:, 1] -= pad_y
+                if hasattr(face, 'landmark_3d_68') and face.landmark_3d_68 is not None:
+                    face.landmark_3d_68[:, 0] -= pad_x
+                    face.landmark_3d_68[:, 1] -= pad_y
+            return faces
+
+    # Strategy 2: downscale the image so the face is smaller relative to det_size
+    for scale in (0.5, 0.35, 0.25):
+        small = cv2.resize(image_bgr, None, fx=scale, fy=scale,
+                           interpolation=cv2.INTER_AREA)
+        faces = analyser.get(small)
+        if faces:
+            print(f'[FaceSwap] Found {len(faces)} face(s) at {scale}x scale')
+            inv = 1.0 / scale
+            for face in faces:
+                face.bbox *= inv
+                if hasattr(face, 'kps') and face.kps is not None:
+                    face.kps *= inv
+                if hasattr(face, 'landmark_2d_106') and face.landmark_2d_106 is not None:
+                    face.landmark_2d_106 *= inv
+                if hasattr(face, 'landmark_3d_68') and face.landmark_3d_68 is not None:
+                    face.landmark_3d_68 *= inv
+            return faces
+
+    print('[FaceSwap] All detection strategies exhausted, no face found')
+    return []
+
+
+# ---------------------------------------------------------------------------
 # Face parsing mask (BiSeNet)
 # ---------------------------------------------------------------------------
 
@@ -109,7 +176,7 @@ def _get_face_parser():
 
 
 def _get_face_parse_mask(image_bgr: np.ndarray, face_bbox: np.ndarray,
-                         expand_ratio: float = 0.2) -> np.ndarray | None:
+                         expand_ratio: float = 0.3) -> np.ndarray | None:
     """Generate a precise face-region mask using BiSeNet parsing.
 
     Returns a float32 mask (0-1) the same size as image_bgr, or None on failure.
@@ -156,8 +223,9 @@ def _get_face_parse_mask(image_bgr: np.ndarray, face_bbox: np.ndarray,
         face_mask_crop = cv2.resize(face_mask_512, (x2 - x1, y2 - y1),
                                     interpolation=cv2.INTER_LINEAR)
 
-        ksize = max(3, int(min(x2 - x1, y2 - y1) * 0.04) | 1)
-        face_mask_crop = cv2.GaussianBlur(face_mask_crop, (ksize, ksize), 0)
+        # Smooth edges so the blend is gradual
+        blur_size = max(3, int(min(x2 - x1, y2 - y1) * 0.06) | 1)
+        face_mask_crop = cv2.GaussianBlur(face_mask_crop, (blur_size, blur_size), 0)
 
         full_mask = np.zeros((h, w), dtype=np.float32)
         full_mask[y1:y2, x1:x2] = face_mask_crop
@@ -169,15 +237,36 @@ def _get_face_parse_mask(image_bgr: np.ndarray, face_bbox: np.ndarray,
         return None
 
 
+def _make_bbox_mask(h: int, w: int, face_bbox: np.ndarray) -> np.ndarray:
+    """Create a soft elliptical mask from a face bounding box."""
+    bbox = face_bbox.astype(int)
+    x1 = max(0, int(bbox[0]))
+    y1 = max(0, int(bbox[1]))
+    x2 = min(w, int(bbox[2]))
+    y2 = min(h, int(bbox[3]))
+
+    mask = np.zeros((h, w), dtype=np.float32)
+    cx = (x1 + x2) // 2
+    cy = (y1 + y2) // 2
+    ax = max(1, (x2 - x1) // 2)
+    ay = max(1, (y2 - y1) // 2)
+    cv2.ellipse(mask, (cx, cy), (ax, ay), 0, 0, 360, 1.0, -1)
+
+    ksize = max(5, int(min(ax, ay) * 0.3) | 1)
+    mask = cv2.GaussianBlur(mask, (ksize, ksize), 0)
+    return mask
+
+
 # ---------------------------------------------------------------------------
 # Color matching
 # ---------------------------------------------------------------------------
 
 def _match_face_color(swapped_bgr: np.ndarray, original_bgr: np.ndarray,
                       mask: np.ndarray) -> np.ndarray:
-    """Match the color/lighting of the swapped face region to the original.
+    """Subtly match the color/lighting of the swapped face to the original.
 
-    Uses per-channel mean/std transfer within the masked face region.
+    Uses per-channel mean/std transfer within the masked face region
+    at a conservative blend factor to avoid washing out the swap.
     """
     if mask is None:
         return swapped_bgr
@@ -198,82 +287,35 @@ def _match_face_color(swapped_bgr: np.ndarray, original_bgr: np.ndarray,
         normalized = (result[:, :, c] - src_mean) / src_std
         transferred = normalized * tgt_std + tgt_mean
 
-        blend_factor = 0.6
+        # Conservative factor: enough to fix obvious mismatches, not so much
+        # that it destroys the swapped face identity
+        blend_factor = 0.35
         blended = result[:, :, c] * (1 - blend_factor) + transferred * blend_factor
-
         result[:, :, c] = np.where(mask_bool, blended, result[:, :, c])
 
     return np.clip(result, 0, 255).astype(np.uint8)
 
 
 # ---------------------------------------------------------------------------
-# Seamless blending (Poisson)
+# Soft-mask alpha blending (primary method -- no Poisson artifacts)
 # ---------------------------------------------------------------------------
 
-def _seamless_blend(swapped_bgr: np.ndarray, original_bgr: np.ndarray,
-                    face_bbox: np.ndarray, parse_mask: np.ndarray | None) -> np.ndarray:
-    """Blend the swapped face into the original using cv2.seamlessClone.
+def _soft_mask_blend(swapped_bgr: np.ndarray, original_bgr: np.ndarray,
+                     mask: np.ndarray) -> np.ndarray:
+    """Blend the swapped face into the original using a soft alpha mask.
 
-    Falls back to feathered alpha blending if seamlessClone fails.
+    This avoids the color-bleeding and ghosting artifacts that
+    cv2.seamlessClone (Poisson blending) produces on angled faces.
+    The mask should already have soft feathered edges.
     """
-    h, w = original_bgr.shape[:2]
-    bbox = face_bbox.astype(int)
-    x1 = max(0, int(bbox[0]))
-    y1 = max(0, int(bbox[1]))
-    x2 = min(w, int(bbox[2]))
-    y2 = min(h, int(bbox[3]))
+    # Extra feathering pass for smooth transition
+    ksize = max(5, int(min(original_bgr.shape[:2]) * 0.03) | 1)
+    soft = cv2.GaussianBlur(mask, (ksize, ksize), 0)
+    soft = cv2.GaussianBlur(soft, (ksize, ksize), 0)
 
-    cx = (x1 + x2) // 2
-    cy = (y1 + y2) // 2
-    cx = max(1, min(w - 2, cx))
-    cy = max(1, min(h - 2, cy))
-
-    if parse_mask is not None and np.any(parse_mask > 0.1):
-        mask_uint8 = (parse_mask * 255).astype(np.uint8)
-    else:
-        mask_uint8 = np.zeros((h, w), dtype=np.uint8)
-        pad = int(min(x2 - x1, y2 - y1) * 0.05)
-        mx1 = max(0, x1 + pad)
-        my1 = max(0, y1 + pad)
-        mx2 = min(w, x2 - pad)
-        my2 = min(h, y2 - pad)
-        if mx2 > mx1 and my2 > my1:
-            cv2.ellipse(
-                mask_uint8,
-                ((mx1 + mx2) // 2, (my1 + my2) // 2),
-                ((mx2 - mx1) // 2, (my2 - my1) // 2),
-                0, 0, 360, 255, -1
-            )
-        else:
-            mask_uint8[y1:y2, x1:x2] = 255
-
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-    mask_uint8 = cv2.dilate(mask_uint8, kernel, iterations=1)
-
-    if np.sum(mask_uint8 > 0) < 100:
-        return swapped_bgr
-
-    try:
-        result = cv2.seamlessClone(
-            swapped_bgr, original_bgr, mask_uint8,
-            (cx, cy), cv2.NORMAL_CLONE
-        )
-        return result
-    except Exception as e:
-        print(f'[FaceSwap] seamlessClone failed ({e}), using feather blend')
-        return _fallback_feather_blend(swapped_bgr, original_bgr, mask_uint8)
-
-
-def _fallback_feather_blend(swapped: np.ndarray, original: np.ndarray,
-                            mask_uint8: np.ndarray) -> np.ndarray:
-    """Alpha blending fallback with Gaussian feathering."""
-    mask = mask_uint8.astype(np.float32) / 255.0
-    ksize = 21
-    mask = cv2.GaussianBlur(mask, (ksize, ksize), 0)
-    mask = cv2.GaussianBlur(mask, (ksize, ksize), 0)
-    mask_3ch = mask[:, :, np.newaxis]
-    result = (swapped.astype(np.float32) * mask_3ch +
-              original.astype(np.float32) * (1 - mask_3ch))
+    mask_3ch = soft[:, :, np.newaxis]
+    result = (swapped_bgr.astype(np.float64) * mask_3ch +
+              original_bgr.astype(np.float64) * (1.0 - mask_3ch))
     return np.clip(result, 0, 255).astype(np.uint8)
 
 
@@ -362,7 +404,7 @@ def _load_gfpgan():
 def _restore_face_gfpgan(image_bgr: np.ndarray, face_bbox: np.ndarray) -> np.ndarray:
     """Apply GFPGAN face restoration to the face region in the image.
 
-    Crops the face, runs GFPGAN at 512x512, and pastes back.
+    Crops the face, runs GFPGAN at 512x512, and pastes back with soft blending.
     Returns the original image unchanged if restoration fails.
     """
     model = _load_gfpgan()
@@ -386,7 +428,6 @@ def _restore_face_gfpgan(image_bgr: np.ndarray, face_bbox: np.ndarray) -> np.nda
     crop_h, crop_w = face_crop.shape[:2]
 
     face_input = cv2.resize(face_crop, (512, 512), interpolation=cv2.INTER_LINEAR)
-    # GFPGAN expects BGR input normalized to [-1, 1]
     face_input = face_input.astype(np.float32) / 255.0
     face_input = (face_input - 0.5) / 0.5
 
@@ -408,7 +449,7 @@ def _restore_face_gfpgan(image_bgr: np.ndarray, face_bbox: np.ndarray) -> np.nda
 
     blend_mask = np.zeros((crop_h, crop_w), dtype=np.float32)
     center = (crop_w // 2, crop_h // 2)
-    axes = (max(1, int(crop_w * 0.38)), max(1, int(crop_h * 0.42)))
+    axes = (max(1, int(crop_w * 0.40)), max(1, int(crop_h * 0.44)))
     cv2.ellipse(blend_mask, center, axes, 0, 0, 360, 1.0, -1)
     blend_mask = cv2.GaussianBlur(blend_mask, (31, 31), 0)
     blend_mask_3ch = blend_mask[:, :, np.newaxis]
@@ -452,7 +493,7 @@ def swap_face(
     face_restore : bool
         Apply GFPGAN face restoration after swapping.
     enhanced_blending : bool
-        Use face-parsing mask + Poisson seamless clone instead of
+        Use face-parsing mask + soft alpha blending instead of
         basic Gaussian feathering.
 
     Returns
@@ -465,7 +506,7 @@ def swap_face(
         print('[FaceSwap] Not available: missing insightface/onnxruntime or inswapper model')
         return None
 
-    # -- Step 0: detect faces --
+    # -- Step 0: load models --
     try:
         analyser = get_face_analyser()
         swapper = get_face_swapper()
@@ -480,9 +521,10 @@ def swap_face(
         print(f'[FaceSwap] Color conversion failed: {e}')
         return None
 
+    # -- Step 1: detect faces (with robust fallbacks for close-ups) --
     try:
-        src_faces = analyser.get(src_bgr)
-        tgt_faces = analyser.get(tgt_bgr)
+        src_faces = _detect_face_robust(analyser, src_bgr)
+        tgt_faces = _detect_face_robust(analyser, tgt_bgr)
     except Exception as e:
         print(f'[FaceSwap] Face detection failed: {e}')
         return None
@@ -491,13 +533,16 @@ def swap_face(
     target_face = _get_largest_face(tgt_faces)
 
     if source_face is None:
-        print('[FaceSwap] No face detected in source/reference image')
+        print(f'[FaceSwap] No face detected in source image ({source_img.shape[1]}x{source_img.shape[0]})')
         return None
     if target_face is None:
-        print('[FaceSwap] No face detected in target image')
+        print(f'[FaceSwap] No face detected in target image ({target_img.shape[1]}x{target_img.shape[0]})')
         return None
 
-    # -- Step 1: core swap (must succeed) --
+    print(f'[FaceSwap] Source face bbox: {source_face.bbox.astype(int).tolist()}')
+    print(f'[FaceSwap] Target face bbox: {target_face.bbox.astype(int).tolist()}')
+
+    # -- Step 2: core InsightFace swap (must succeed) --
     try:
         result_bgr = swapper.get(tgt_bgr, target_face, source_face, paste_back=True)
         print('[FaceSwap] Core swap successful')
@@ -505,41 +550,49 @@ def swap_face(
         print(f'[FaceSwap] Core swap failed: {e}')
         return None
 
-    # -- Step 2: enhanced blending (each sub-step individually protected) --
-    if enhanced_blending:
-        parse_mask = None
-        try:
-            parse_mask = _get_face_parse_mask(result_bgr, target_face.bbox)
-            if parse_mask is not None:
-                print('[FaceSwap] Face parsing mask generated')
-            else:
-                print('[FaceSwap] Face parsing returned None, using bbox fallback')
-        except Exception as e:
-            print(f'[FaceSwap] Face parsing failed (continuing without): {e}')
+    # -- Step 3: enhanced blending (each sub-step individually protected) --
+    h, w = tgt_bgr.shape[:2]
 
+    if enhanced_blending:
+        # 3a. Build the blend mask (face parsing or bbox fallback)
+        blend_mask = None
+        try:
+            blend_mask = _get_face_parse_mask(result_bgr, target_face.bbox)
+            if blend_mask is not None:
+                print('[FaceSwap] Face parsing mask generated')
+        except Exception as e:
+            print(f'[FaceSwap] Face parsing failed (continuing with bbox mask): {e}')
+
+        if blend_mask is None:
+            blend_mask = _make_bbox_mask(h, w, target_face.bbox)
+            print('[FaceSwap] Using elliptical bbox mask as fallback')
+
+        # 3b. Color matching (subtle)
         if color_match:
             try:
-                result_bgr = _match_face_color(result_bgr, tgt_bgr, parse_mask)
+                result_bgr = _match_face_color(result_bgr, tgt_bgr, blend_mask)
                 print('[FaceSwap] Color matching applied')
             except Exception as e:
                 print(f'[FaceSwap] Color matching failed (continuing without): {e}')
 
+        # 3c. Soft-mask alpha blend (replaces Poisson seamlessClone)
         try:
-            result_bgr = _seamless_blend(result_bgr, tgt_bgr, target_face.bbox, parse_mask)
-            print('[FaceSwap] Seamless blending applied')
+            result_bgr = _soft_mask_blend(result_bgr, tgt_bgr, blend_mask)
+            print('[FaceSwap] Soft-mask blending applied')
         except Exception as e:
-            print(f'[FaceSwap] Seamless blending failed (using basic blend): {e}')
+            print(f'[FaceSwap] Soft-mask blending failed (using legacy blend): {e}')
             try:
                 result_bgr = _smooth_face_boundary(result_bgr, tgt_bgr, target_face)
             except Exception:
                 pass
+
     elif enhance_blend:
         try:
             result_bgr = _smooth_face_boundary(result_bgr, tgt_bgr, target_face)
         except Exception as e:
             print(f'[FaceSwap] Basic blending failed (continuing without): {e}')
 
-    # -- Step 3: GFPGAN restoration (individually protected) --
+    # -- Step 4: GFPGAN face restoration --
     if face_restore:
         try:
             result_bgr = _restore_face_gfpgan(result_bgr, target_face.bbox)
@@ -547,6 +600,7 @@ def swap_face(
         except Exception as e:
             print(f'[FaceSwap] GFPGAN restoration failed (continuing without): {e}')
 
+    print('[FaceSwap] Pipeline complete')
     return cv2.cvtColor(result_bgr, cv2.COLOR_BGR2RGB)
 
 
