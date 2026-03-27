@@ -42,6 +42,7 @@ from modules.face_engine import prepare_face_tasks
 from modules.skin_detector import detect_skin_tone
 from ui.pages.campaign import build_campaign_tab
 from ui.pages.gallery import build_gallery_tab
+from ui.pages.face_swap_studio import build_face_swap_tab
 from ui.components.dimension_input import (
     build_dimension_input, wire_dimension_resolver, wire_image_interrogation,
 )
@@ -774,6 +775,9 @@ def build_ui():
                                 scale=1,
                             )
 
+                    with gr.Tab(label='Face Swap Studio'):
+                        face_swap_ui = build_face_swap_tab()
+
                     with gr.Tab(label='Campaign'):
                         campaign_ui = build_campaign_tab()
 
@@ -850,15 +854,19 @@ def build_ui():
             queue=False, show_progress='hidden',
         )
 
-        # ── Wire: Campaign character dropdown sync ──
+        # ── Wire: Campaign & Face Swap Studio character dropdown sync ──
+        def _sync_character_dropdowns():
+            choices = list_profile_names()
+            return gr.update(choices=choices), gr.update(choices=choices)
+
         save_char_btn.click(
-            lambda: gr.update(choices=list_profile_names()),
-            outputs=[campaign_ui['character']],
+            _sync_character_dropdowns,
+            outputs=[campaign_ui['character'], face_swap_ui['character']],
             queue=False, show_progress='hidden',
         )
         delete_char_btn.click(
-            lambda: gr.update(choices=list_profile_names()),
-            outputs=[campaign_ui['character']],
+            _sync_character_dropdowns,
+            outputs=[campaign_ui['character'], face_swap_ui['character']],
             queue=False, show_progress='hidden',
         )
 
