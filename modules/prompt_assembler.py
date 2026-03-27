@@ -73,6 +73,25 @@ def load_options_no_none(wildcard_filename: str) -> list[str]:
     return lines
 
 
+def resolve_dimension_value(
+    dropdown_val: str = '',
+    custom_text: str = '',
+    image_description: str = '',
+) -> str:
+    """Resolve the effective value for a creative dimension.
+
+    Priority: image_description > custom_text > dropdown_val.
+    Returns empty string if nothing is set.
+    """
+    if image_description and image_description.strip() and image_description.strip() != NONE_OPTION:
+        return image_description.strip()
+    if custom_text and custom_text.strip():
+        return custom_text.strip()
+    if dropdown_val and dropdown_val != NONE_OPTION and dropdown_val.strip():
+        return dropdown_val
+    return ''
+
+
 def _is_set(val: str) -> bool:
     return val and val != NONE_OPTION and val.strip() != ''
 

@@ -1,7 +1,9 @@
-"""Freyra v3.0 -- The Opinionated AI Photo Studio
+"""Freyra v3.1 -- The Opinionated AI Influencer Photo Studio
 
 Main UI application. Replaces the old monolithic webui.py with a clean,
-opinionated interface built around creative dimensions.
+opinionated interface built around creative dimensions. Every dimension
+supports three input modes: dropdown presets, custom text, and reference
+image upload with BLIP-powered extraction.
 """
 
 import gradio as gr
@@ -20,7 +22,7 @@ import freyra_version
 
 from modules.auth import auth_enabled, check_auth
 from modules.prompt_assembler import (
-    load_options, load_options_no_none, NONE_OPTION, DIMENSION_FILES,
+    load_options, NONE_OPTION,
     assemble_prompt, randomize_dimensions, get_smart_aspect_ratio,
 )
 from modules.shoot_types import (
@@ -30,18 +32,22 @@ from modules.shoot_types import (
 from ui.theme import create_freyra_theme, FREYRA_CSS
 from ui.constants import (
     FREYRA_TITLE, FREYRA_SUBTITLE, IMAGE_COUNT_MAX, IMAGE_COUNT_DEFAULT,
+    DEFAULT_QUALITY_PROMPT,
 )
 from ui.components.vram_indicator import create_vram_indicator
 from modules.character_profiles import (
     list_profile_names, save_profile, load_profile, delete_profile,
 )
-from modules.face_engine import prepare_face_tasks, auto_select_method
+from modules.face_engine import prepare_face_tasks
 from modules.skin_detector import detect_skin_tone
 from ui.pages.campaign import build_campaign_tab
 from ui.pages.gallery import build_gallery_tab
-from ui.components.visual_picker import build_visual_picker
+from ui.components.dimension_input import (
+    build_dimension_input, wire_dimension_resolver, wire_image_interrogation,
+)
+from ui.components.advanced_panel import build_advanced_panel
 from modules.history_store import (
-    load_history, add_entry as history_add_entry,
+    add_entry as history_add_entry,
     clear_history, export_history_json, import_history_json,
     render_history_html,
 )
@@ -78,13 +84,14 @@ def _resolve_pose_image(pose_reference_image, pose_editor_data):
 def _build_task_params(
     shoot_type_label, quality_label, image_number, image_seed, seed_random,
     skin_tone, hair_style, hair_color,
-    outfit, outfit_custom, pose, pose_custom,
+    outfit, pose,
     makeup, expression,
-    background, background_custom,
+    background,
     lighting, camera_angle, footwear, custom_prompt,
     face_image_1, face_image_2, face_image_3,
     face_swap_on,
     pose_reference_image=None, pose_editor_data=None,
+    advanced_overrides=None,
 ):
     """Build a params dict for AsyncTask.from_dict() from creative dimensions."""
     shoot = get_shoot_type(shoot_type_label)
@@ -95,20 +102,16 @@ def _build_task_params(
     if quality is None:
         quality = QUALITY_MODES["standard"]
 
-    effective_outfit = outfit_custom.strip() if outfit_custom and outfit_custom.strip() else outfit
-    effective_pose = pose_custom.strip() if pose_custom and pose_custom.strip() else pose
-    effective_bg = background_custom.strip() if background_custom and background_custom.strip() else background
-
     assembled = assemble_prompt(
         shoot_type_config=shoot,
         skin_tone=skin_tone,
         hair_style=hair_style,
         hair_color=hair_color,
-        outfit=effective_outfit,
-        pose=effective_pose,
+        outfit=outfit,
+        pose=pose,
         makeup=makeup,
         expression=expression,
-        background=effective_bg,
+        background=background,
         lighting=lighting,
         camera_angle=camera_angle,
         footwear=footwear,
@@ -161,6 +164,66 @@ def _build_task_params(
         'builder_enabled': False,
         '_freyra_always_show_results': True,
     }
+
+    # Apply advanced overrides when the user has enabled them
+    if advanced_overrides:
+        ov = advanced_overrides
+        if ov.get('performance_selection'):
+            params['performance'] = ov['performance_selection']
+        if ov.get('generation_steps') is not None:
+            params['generation_steps'] = int(ov['generation_steps'])
+        if ov.get('aspect_ratios_selection'):
+            params['aspect_ratio'] = ov['aspect_ratios_selection']
+        if ov.get('output_format'):
+            params['output_format'] = ov['output_format']
+        if ov.get('negative_prompt') is not None:
+            params['negative_prompt'] = ov['negative_prompt']
+        if ov.get('style_selections') is not None:
+            params['styles'] = ov['style_selections']
+        if ov.get('base_model'):
+            params['base_model'] = ov['base_model']
+        if ov.get('refiner_model'):
+            params['refiner_model'] = ov['refiner_model']
+        if ov.get('refiner_switch') is not None:
+            params['refiner_switch'] = ov['refiner_switch']
+        if ov.get('guidance_scale') is not None:
+            params['cfg_scale'] = ov['guidance_scale']
+        if ov.get('sharpness') is not None:
+            params['sharpness'] = ov['sharpness']
+        if ov.get('sampler_name'):
+            params['sampler'] = ov['sampler_name']
+        if ov.get('scheduler_name'):
+            params['scheduler'] = ov['scheduler_name']
+        if ov.get('vae_name'):
+            params['vae'] = ov['vae_name']
+        if ov.get('overwrite_step') is not None:
+            params['overwrite_step'] = ov['overwrite_step']
+        if ov.get('overwrite_switch') is not None:
+            params['overwrite_switch'] = ov['overwrite_switch']
+        if ov.get('overwrite_width') is not None:
+            params['overwrite_width'] = ov['overwrite_width']
+        if ov.get('overwrite_height') is not None:
+            params['overwrite_height'] = ov['overwrite_height']
+        if ov.get('overwrite_vary_strength') is not None:
+            params['overwrite_vary_strength'] = ov['overwrite_vary_strength']
+        if ov.get('overwrite_upscale_strength') is not None:
+            params['overwrite_upscale_strength'] = ov['overwrite_upscale_strength']
+        if ov.get('disable_preview') is not None:
+            params['disable_preview'] = ov['disable_preview']
+        if ov.get('disable_intermediate_results') is not None:
+            params['disable_intermediate_results'] = ov['disable_intermediate_results']
+        if ov.get('generate_image_grid') is not None:
+            params['generate_image_grid'] = ov['generate_image_grid']
+
+        for fk in ['freeu_enabled', 'freeu_b1', 'freeu_b2', 'freeu_s1', 'freeu_s2']:
+            if ov.get(fk) is not None:
+                params[fk] = ov[fk]
+
+        for ck in ['adm_scaler_positive', 'adm_scaler_negative', 'adm_scaler_end',
+                    'adaptive_cfg', 'clip_skip', 'refiner_swap_method',
+                    'controlnet_softness', 'canny_low_threshold', 'canny_high_threshold']:
+            if ov.get(ck) is not None:
+                params[ck] = ov[ck]
 
     face_images = [fi for fi in [face_image_1, face_image_2, face_image_3] if fi is not None]
     cn_tasks = prepare_face_tasks(face_images)
@@ -269,7 +332,6 @@ def generate_clicked(task: worker.AsyncTask):
 
 def _capture_history(task):
     """Capture generation results into server-side history after completion."""
-    # Fallback to the live worker state if Gradio state wasn't synced
     results = getattr(task, 'results', []) or []
     prompt = getattr(task, 'prompt', '') or ''
     seed = getattr(task, 'seed', '?')
@@ -283,7 +345,7 @@ def _capture_history(task):
     image_paths = [r for r in results if isinstance(r, str)]
     if image_paths:
         history_add_entry(prompt=prompt, seed=seed, image_paths=image_paths)
-    
+
     return render_history_html()
 
 
@@ -301,7 +363,6 @@ def build_ui():
         current_task = gr.State(worker.AsyncTask(args=[]))
         state_is_generating = gr.State(False)
 
-        # Header
         gr.HTML(
             f'<div class="freyra-header">'
             f'<h1>{FREYRA_TITLE}</h1>'
@@ -312,7 +373,6 @@ def build_ui():
         with gr.Row():
             # ── LEFT COLUMN: Creative Controls ──
             with gr.Column(scale=1):
-                # Shoot Type
                 shoot_type = gr.Radio(
                     label='Shoot Type',
                     choices=SHOOT_TYPE_LABELS,
@@ -320,7 +380,6 @@ def build_ui():
                     elem_classes=['shoot-type-radio'],
                 )
 
-                # Quality Mode
                 quality_mode = gr.Radio(
                     label='Quality',
                     choices=QUALITY_MODE_LABELS,
@@ -328,7 +387,6 @@ def build_ui():
                     elem_classes=['quality-radio'],
                 )
 
-                # Image Count + Randomize
                 image_number = gr.Slider(
                     label='Number of Images',
                     minimum=1,
@@ -343,7 +401,7 @@ def build_ui():
                     size='sm',
                 )
 
-                # Character / Face
+                # ── Character / Face ──
                 with gr.Accordion('Character / Face', open=True, elem_classes=['dimension-section']):
                     saved_profiles = list_profile_names()
                     character_select = gr.Dropdown(
@@ -429,7 +487,6 @@ def build_ui():
                         queue=False, show_progress='hidden',
                     )
 
-                    # Auto-detect skin tone from uploaded face reference
                     def auto_detect_skin(img):
                         if img is None:
                             return gr.update()
@@ -438,74 +495,68 @@ def build_ui():
                             return gr.update(value=detected)
                         return gr.update()
 
-                # Skin Tone (auto-detected from face reference)
-                skin_tone_options = load_options('skin_tones.txt')
-                with gr.Accordion('Skin Tone', open=False, elem_classes=['dimension-section']):
-                    skin_tone = gr.Dropdown(
-                        label='Skin Tone', choices=skin_tone_options,
-                        value=NONE_OPTION, interactive=True,
-                    )
-                    gr.Markdown(
-                        '<span style="font-size:11px;color:#666;">'
-                        'Auto-detected from face reference. Override manually if needed.'
-                        '</span>'
-                    )
+                # ── Creative Dimensions (tri-mode: dropdown + text + image) ──
+
+                dim_skin = build_dimension_input(
+                    'skin_tone', 'Skin Tone',
+                    load_options('skin_tones.txt'),
+                    allow_image=True,
+                )
+                wire_dimension_resolver(dim_skin)
+                wire_image_interrogation(dim_skin, 'skin_tone')
 
                 # Wire face upload -> skin tone auto-detection
                 face_image_1.change(
-                    auto_detect_skin, inputs=[face_image_1], outputs=[skin_tone],
+                    auto_detect_skin, inputs=[face_image_1],
+                    outputs=[dim_skin['dropdown']],
                     queue=False, show_progress='hidden',
                 )
                 face_image_2.change(
-                    auto_detect_skin, inputs=[face_image_2], outputs=[skin_tone],
+                    auto_detect_skin, inputs=[face_image_2],
+                    outputs=[dim_skin['dropdown']],
                     queue=False, show_progress='hidden',
                 )
                 face_image_3.change(
-                    auto_detect_skin, inputs=[face_image_3], outputs=[skin_tone],
+                    auto_detect_skin, inputs=[face_image_3],
+                    outputs=[dim_skin['dropdown']],
                     queue=False, show_progress='hidden',
                 )
 
-                # Hair Style
-                hair_style_options = load_options('influencer_hair.txt')
-                with gr.Accordion('Hair Style', open=False, elem_classes=['dimension-section']):
-                    hair_style = gr.Dropdown(
-                        label='Select Hair Style', choices=hair_style_options,
-                        value=NONE_OPTION, interactive=True,
-                    )
+                dim_hair_style = build_dimension_input(
+                    'hair_style', 'Hair Style',
+                    load_options('influencer_hair.txt'),
+                    allow_image=True,
+                )
+                wire_dimension_resolver(dim_hair_style)
+                wire_image_interrogation(dim_hair_style, 'hair_style')
 
-                # Hair Color
-                hair_color_options = load_options('influencer_hair_colors.txt')
-                with gr.Accordion('Hair Color', open=False, elem_classes=['dimension-section']):
-                    hair_color = gr.Dropdown(
-                        label='Select Hair Color', choices=hair_color_options,
-                        value=NONE_OPTION, interactive=True,
-                    )
+                dim_hair_color = build_dimension_input(
+                    'hair_color', 'Hair Color',
+                    load_options('influencer_hair_colors.txt'),
+                    allow_image=True,
+                )
+                wire_dimension_resolver(dim_hair_color)
+                wire_image_interrogation(dim_hair_color, 'hair_color')
 
-                # Outfit
-                outfit_options = load_options('influencer_outfits.txt')
-                with gr.Accordion('Outfit', open=False, elem_classes=['dimension-section']):
-                    outfit_picker_html, outfit = build_visual_picker(
-                        'influencer_outfits', outfit_options, label='Select Outfit',
-                    )
-                    outfit_custom = gr.Textbox(
-                        label='Custom Outfit',
-                        placeholder='Or describe your own...',
-                        lines=1, max_lines=1,
-                    )
+                dim_outfit = build_dimension_input(
+                    'outfit', 'Outfit',
+                    load_options('influencer_outfits.txt'),
+                    allow_image=True,
+                )
+                wire_dimension_resolver(dim_outfit)
+                wire_image_interrogation(dim_outfit, 'outfit')
 
-                # Pose
-                pose_options = load_options('influencer_poses.txt')
-                with gr.Accordion('Pose', open=False, elem_classes=['dimension-section']):
-                    pose_picker_html, pose = build_visual_picker(
-                        'influencer_poses', pose_options, label='Select Pose',
-                    )
-                    pose_custom = gr.Textbox(
-                        label='Custom Pose',
-                        placeholder='Or describe your own...',
-                        lines=1, max_lines=1,
-                    )
+                dim_pose = build_dimension_input(
+                    'pose', 'Pose',
+                    load_options('influencer_poses.txt'),
+                    allow_image=True,
+                )
+                wire_dimension_resolver(dim_pose)
+                wire_image_interrogation(dim_pose, 'pose')
+
+                with gr.Accordion('Pose Reference', open=False, elem_classes=['dimension-section']):
                     gr.Markdown(
-                        '<span style="font-size:12px;color:#888;margin-top:8px;display:block;">'
+                        '<span style="font-size:12px;color:#888;">'
                         'Upload a pose reference image or use the stick-figure editor '
                         'for structural guidance (uses ControlNet internally).'
                         '</span>'
@@ -520,64 +571,67 @@ def build_ui():
                     from ui.components.pose_editor import build_pose_editor
                     pose_editor_html, pose_editor_output = build_pose_editor()
 
-                # Makeup
-                makeup_options = load_options('influencer_makeup.txt')
-                with gr.Accordion('Makeup', open=False, elem_classes=['dimension-section']):
-                    makeup_picker_html, makeup = build_visual_picker(
-                        'influencer_makeup', makeup_options, label='Select Makeup',
-                    )
+                dim_makeup = build_dimension_input(
+                    'makeup', 'Makeup',
+                    load_options('influencer_makeup.txt'),
+                    allow_image=True,
+                )
+                wire_dimension_resolver(dim_makeup)
+                wire_image_interrogation(dim_makeup, 'makeup')
 
-                # Expression
-                expression_options = load_options('influencer_expressions.txt')
-                with gr.Accordion('Expression', open=False, elem_classes=['dimension-section']):
-                    expression_picker_html, expression = build_visual_picker(
-                        'influencer_expressions', expression_options, label='Select Expression',
-                    )
+                dim_expression = build_dimension_input(
+                    'expression', 'Expression',
+                    load_options('influencer_expressions.txt'),
+                    allow_image=True,
+                )
+                wire_dimension_resolver(dim_expression)
+                wire_image_interrogation(dim_expression, 'expression')
 
-                # Background
-                bg_options = load_options('influencer_settings.txt')
-                with gr.Accordion('Background', open=False, elem_classes=['dimension-section']):
-                    bg_picker_html, background = build_visual_picker(
-                        'influencer_settings', bg_options, label='Select Background',
-                    )
-                    background_custom = gr.Textbox(
-                        label='Custom Background',
-                        placeholder='Or describe your own...',
-                        lines=1, max_lines=1,
-                    )
+                dim_background = build_dimension_input(
+                    'background', 'Background',
+                    load_options('influencer_settings.txt'),
+                    allow_image=True,
+                )
+                wire_dimension_resolver(dim_background)
+                wire_image_interrogation(dim_background, 'background')
 
-                # Lighting
-                lighting_options = load_options('influencer_lighting.txt')
-                with gr.Accordion('Lighting', open=False, elem_classes=['dimension-section']):
-                    lighting_picker_html, lighting = build_visual_picker(
-                        'influencer_lighting', lighting_options, label='Select Lighting',
-                    )
+                dim_lighting = build_dimension_input(
+                    'lighting', 'Lighting',
+                    load_options('influencer_lighting.txt'),
+                    allow_image=True,
+                )
+                wire_dimension_resolver(dim_lighting)
+                wire_image_interrogation(dim_lighting, 'lighting')
 
-                # Camera Angle
-                camera_options = load_options('influencer_camera_angles.txt')
-                with gr.Accordion('Camera Angle', open=False, elem_classes=['dimension-section']):
-                    camera_angle = gr.Dropdown(
-                        label='Select Camera Angle', choices=camera_options,
-                        value=NONE_OPTION, interactive=True,
-                    )
+                dim_camera = build_dimension_input(
+                    'camera_angle', 'Camera Angle',
+                    load_options('influencer_camera_angles.txt'),
+                    allow_image=True,
+                )
+                wire_dimension_resolver(dim_camera)
+                wire_image_interrogation(dim_camera, 'camera_angle')
 
-                # Footwear
-                footwear_options = load_options('influencer_footwear.txt')
-                with gr.Accordion('Footwear', open=False, elem_classes=['dimension-section']):
-                    footwear = gr.Dropdown(
-                        label='Select Footwear', choices=footwear_options,
-                        value=NONE_OPTION, interactive=True,
-                    )
+                dim_footwear = build_dimension_input(
+                    'footwear', 'Footwear',
+                    load_options('influencer_footwear.txt'),
+                    allow_image=True,
+                )
+                wire_dimension_resolver(dim_footwear)
+                wire_image_interrogation(dim_footwear, 'footwear')
 
-                # Custom Prompt (optional extra)
-                with gr.Accordion('Additional Details', open=False, elem_classes=['dimension-section']):
-                    custom_prompt = gr.Textbox(
-                        label='Extra Details',
-                        placeholder='Add any additional details...',
-                        lines=2, max_lines=3,
-                    )
+                # ── Extra Details (always visible with smart defaults) ──
+                gr.Markdown(
+                    '<div style="margin-top:12px;font-weight:600;font-size:14px;">'
+                    'Extra Details</div>'
+                )
+                custom_prompt = gr.Textbox(
+                    label='Quality & Style Details',
+                    placeholder='Describe quality, style, mood...',
+                    value=DEFAULT_QUALITY_PROMPT,
+                    lines=2, max_lines=4,
+                )
 
-                # Seed (reproducibility control)
+                # ── Seed ──
                 with gr.Accordion('Seed', open=False, elem_classes=['dimension-section']):
                     seed_random = gr.Checkbox(label='Random Seed', value=True)
                     image_seed = gr.Textbox(label='Seed', value='0', visible=False)
@@ -587,7 +641,7 @@ def build_ui():
                         queue=False, show_progress='hidden',
                     )
 
-                # Metadata / EXIF Settings
+                # ── Metadata / EXIF Settings ──
                 with gr.Accordion('Metadata / EXIF', open=False, elem_classes=['dimension-section']):
                     from modules.metadata_spoof import list_camera_profiles
                     from modules import private_logger
@@ -632,6 +686,9 @@ def build_ui():
                             outputs=[],
                             queue=False, show_progress='hidden',
                         )
+
+                # ── Advanced Settings Panel ──
+                adv = build_advanced_panel()
 
                 # VRAM Monitor
                 create_vram_indicator()
@@ -739,12 +796,26 @@ def build_ui():
                         )
 
         # ── Wire: Surprise Me button ──
-        # Skin tone and hair color are identity traits -- never randomized.
-        # They should come from the reference face or be set manually.
+        all_dimensions = {
+            'skin_tone': dim_skin, 'hair_style': dim_hair_style,
+            'hair_color': dim_hair_color, 'outfit': dim_outfit,
+            'pose': dim_pose, 'makeup': dim_makeup,
+            'expression': dim_expression, 'background': dim_background,
+            'lighting': dim_lighting, 'camera_angle': dim_camera,
+            'footwear': dim_footwear,
+        }
+
         randomize_outputs = [
-            shoot_type, hair_style,
-            outfit, pose, makeup, expression,
-            background, lighting, camera_angle, footwear,
+            shoot_type,
+            dim_hair_style['dropdown'],
+            dim_outfit['dropdown'],
+            dim_pose['dropdown'],
+            dim_makeup['dropdown'],
+            dim_expression['dropdown'],
+            dim_background['dropdown'],
+            dim_lighting['dropdown'],
+            dim_camera['dropdown'],
+            dim_footwear['dropdown'],
         ]
 
         def on_randomize():
@@ -769,7 +840,6 @@ def build_ui():
         )
 
         # ── Wire: Campaign character dropdown sync ──
-        # When characters are saved/deleted in Studio, update Campaign's dropdown too
         save_char_btn.click(
             lambda: gr.update(choices=list_profile_names()),
             outputs=[campaign_ui['character']],
@@ -782,43 +852,56 @@ def build_ui():
         )
 
         # ── Wire: prompt preview updates ──
-        all_dimension_inputs = [
-            shoot_type, skin_tone, hair_style, hair_color,
-            outfit, outfit_custom, pose, pose_custom, makeup, expression,
-            background, background_custom, lighting, camera_angle, footwear,
+        # The resolved textboxes hold the effective value for each dimension
+        all_preview_inputs = [
+            shoot_type,
+            dim_skin['resolved'], dim_hair_style['resolved'],
+            dim_hair_color['resolved'],
+            dim_outfit['resolved'], dim_pose['resolved'],
+            dim_makeup['resolved'], dim_expression['resolved'],
+            dim_background['resolved'],
+            dim_lighting['resolved'], dim_camera['resolved'],
+            dim_footwear['resolved'],
             custom_prompt,
         ]
 
         def update_prompt_preview(
-            st, sk, hs, hc, ou, ou_c, po, po_c, mk, ex,
-            bg, bg_c, lt, ca, fw, cp,
+            st, sk, hs, hc, ou, po, mk, ex, bg, lt, ca, fw, cp,
         ):
             shoot = get_shoot_type(st)
             if shoot is None:
                 shoot = list(SHOOT_TYPES.values())[0]
 
-            effective_outfit = ou_c.strip() if ou_c and ou_c.strip() else ou
-            effective_pose = po_c.strip() if po_c and po_c.strip() else po
-            effective_bg = bg_c.strip() if bg_c and bg_c.strip() else bg
-
             assembled = assemble_prompt(
                 shoot_type_config=shoot,
                 skin_tone=sk, hair_style=hs, hair_color=hc,
-                outfit=effective_outfit, pose=effective_pose,
+                outfit=ou, pose=po,
                 makeup=mk, expression=ex,
-                background=effective_bg, lighting=lt,
+                background=bg, lighting=lt,
                 camera_angle=ca, footwear=fw,
                 custom_prompt=cp,
             )
             return assembled['prompt']
 
-        for component in all_dimension_inputs:
+        for component in all_preview_inputs:
             component.change(
                 update_prompt_preview,
-                inputs=all_dimension_inputs,
+                inputs=all_preview_inputs,
                 outputs=[prompt_preview],
                 queue=False, show_progress='hidden',
             )
+
+        # Also trigger on dropdown/custom changes for each dimension
+        for dim_key, dim_comps in all_dimensions.items():
+            for sub_key in ['dropdown', 'custom']:
+                comp = dim_comps.get(sub_key)
+                if comp is not None:
+                    comp.change(
+                        update_prompt_preview,
+                        inputs=all_preview_inputs,
+                        outputs=[prompt_preview],
+                        queue=False, show_progress='hidden',
+                    )
 
         # ── Wire: History tab ──
         history_refresh_btn.click(
@@ -890,49 +973,104 @@ def build_ui():
             queue=False, show_progress='hidden',
         )
 
+        # Build the generation inputs list. Uses resolved values from each dimension.
         generation_inputs = [
             shoot_type, quality_mode, image_number, image_seed, seed_random,
-            skin_tone, hair_style, hair_color,
-            outfit, outfit_custom, pose, pose_custom,
-            makeup, expression,
-            background, background_custom,
-            lighting, camera_angle, footwear, custom_prompt,
+            dim_skin['resolved'], dim_hair_style['resolved'],
+            dim_hair_color['resolved'],
+            dim_outfit['resolved'], dim_pose['resolved'],
+            dim_makeup['resolved'], dim_expression['resolved'],
+            dim_background['resolved'],
+            dim_lighting['resolved'], dim_camera['resolved'],
+            dim_footwear['resolved'], custom_prompt,
             face_image_1, face_image_2, face_image_3,
             face_swap_enabled,
             pose_reference_image, pose_editor_output,
+            adv['advanced_checkbox'],
         ]
 
-        def prepare_generation(
-            st, qm, img_num, img_seed, seed_rnd,
-            sk, hs, hc,
-            ou, ou_c, po, po_c,
-            mk, ex,
-            bg, bg_c,
-            lt, ca, fw, cp,
-            fi1, fi2, fi3,
-            fs_on,
-            pose_ref_img, pose_ed_data,
-        ):
+        # Add advanced panel components as additional inputs
+        adv_input_keys = [
+            'performance_selection', 'generation_steps',
+            'aspect_ratios_selection', 'output_format', 'negative_prompt',
+            'style_selections', 'base_model', 'refiner_model', 'refiner_switch',
+            'guidance_scale', 'sharpness', 'sampler_name', 'scheduler_name',
+            'vae_name',
+            'overwrite_step', 'overwrite_switch', 'overwrite_width',
+            'overwrite_height', 'overwrite_vary_strength',
+            'overwrite_upscale_strength',
+            'disable_preview', 'disable_intermediate_results',
+            'disable_seed_increment', 'read_wildcards_in_order',
+            'black_out_nsfw',
+            'adm_scaler_positive', 'adm_scaler_negative', 'adm_scaler_end',
+            'adaptive_cfg', 'clip_skip', 'refiner_swap_method',
+            'controlnet_softness',
+            'debugging_cn_preprocessor', 'skipping_cn_preprocessor',
+            'mixing_image_prompt_and_vary_upscale',
+            'mixing_image_prompt_and_inpaint',
+            'canny_low_threshold', 'canny_high_threshold',
+            'freeu_enabled', 'freeu_b1', 'freeu_b2', 'freeu_s1', 'freeu_s2',
+            'generate_image_grid',
+        ]
+
+        for ak in adv_input_keys:
+            comp = adv.get(ak)
+            if comp is not None:
+                generation_inputs.append(comp)
+
+        def prepare_generation(*args):
+            idx = 0
+
+            def _next():
+                nonlocal idx
+                val = args[idx]
+                idx += 1
+                return val
+
+            st = _next(); qm = _next(); img_num = _next()
+            img_seed = _next(); seed_rnd = _next()
+            sk = _next(); hs = _next(); hc = _next()
+            ou = _next(); po = _next()
+            mk = _next(); ex = _next()
+            bg = _next()
+            lt = _next(); ca = _next(); fw = _next()
+            cp = _next()
+            fi1 = _next(); fi2 = _next(); fi3 = _next()
+            fs_on = _next()
+            pose_ref_img = _next(); pose_ed_data = _next()
+            adv_enabled = _next()
+
+            # Always consume the advanced args from the inputs list
+            # (Gradio passes them regardless of checkbox state)
+            adv_values = {}
+            for ak in adv_input_keys:
+                if adv.get(ak) is not None:
+                    adv_values[ak] = _next()
+                else:
+                    adv_values[ak] = None
+
+            advanced_overrides = adv_values if adv_enabled else None
+
             params, seed = _build_task_params(
                 shoot_type_label=st, quality_label=qm,
                 image_number=img_num, image_seed=img_seed, seed_random=seed_rnd,
                 skin_tone=sk, hair_style=hs, hair_color=hc,
-                outfit=ou, outfit_custom=ou_c, pose=po, pose_custom=po_c,
+                outfit=ou, pose=po,
                 makeup=mk, expression=ex,
-                background=bg, background_custom=bg_c,
+                background=bg,
                 lighting=lt, camera_angle=ca, footwear=fw,
                 custom_prompt=cp,
                 face_image_1=fi1, face_image_2=fi2, face_image_3=fi3,
                 face_swap_on=fs_on,
                 pose_reference_image=pose_ref_img,
                 pose_editor_data=pose_ed_data,
+                advanced_overrides=advanced_overrides,
             )
 
             task = _create_task_from_params(params)
             return task
 
         def _reuse_seed(seed_text):
-            """Extract numeric seed from display text and apply it."""
             val = seed_text.replace('Seed:', '').strip() if seed_text else ''
             try:
                 int(val)
