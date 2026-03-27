@@ -42,6 +42,7 @@ DIMENSION_FILES = {
     'skin_tone': 'skin_tones.txt',
     'hair_style': 'influencer_hair.txt',
     'hair_color': 'influencer_hair_colors.txt',
+    'hair_length': 'influencer_hair_lengths.txt',
     'outfit': 'influencer_outfits.txt',
     'pose': 'influencer_poses.txt',
     'makeup': 'influencer_makeup.txt',
@@ -96,11 +97,35 @@ def _is_set(val: str) -> bool:
     return val and val != NONE_OPTION and val.strip() != ''
 
 
+def _build_hair_description(hair_color: str, hair_length: str, hair_style: str) -> str:
+    """Combine hair color, length, and style into natural phrasing."""
+    parts = []
+    if _is_set(hair_color):
+        parts.append(hair_color)
+    if _is_set(hair_length):
+        parts.append(hair_length)
+    if _is_set(hair_style):
+        parts.append(hair_style)
+    if not parts:
+        return ''
+    return f'with {" ".join(parts)} hair'
+
+
+def _has_preposition(text: str) -> bool:
+    """Check if text already starts with a spatial preposition."""
+    lower = text.lower().strip()
+    return any(lower.startswith(p) for p in [
+        'in ', 'at ', 'on ', 'inside ', 'outside ', 'near ', 'beside ',
+        'against ', 'under ', 'overlooking ', 'surrounded by ',
+    ])
+
+
 def assemble_prompt(
     shoot_type_config: dict,
     skin_tone: str = '',
     hair_style: str = '',
     hair_color: str = '',
+    hair_length: str = '',
     outfit: str = '',
     pose: str = '',
     makeup: str = '',
@@ -123,12 +148,9 @@ def assemble_prompt(
 
     subject_parts.append('woman')
 
-    if _is_set(hair_color) and _is_set(hair_style):
-        subject_parts.append(f'with {hair_color} {hair_style} hair')
-    elif _is_set(hair_style):
-        subject_parts.append(f'with {hair_style} hair')
-    elif _is_set(hair_color):
-        subject_parts.append(f'with {hair_color} hair')
+    hair_desc = _build_hair_description(hair_color, hair_length, hair_style)
+    if hair_desc:
+        subject_parts.append(hair_desc)
 
     if _is_set(expression):
         subject_parts.append(f'{expression}')
@@ -136,27 +158,42 @@ def assemble_prompt(
     subject_description = ' '.join(subject_parts)
 
     prompt_template = shoot_type_config.get('prompt_template', '{subject}')
-    prompt = prompt_template.replace('{subject}', subject_description)
+
+    if _is_set(camera_angle):
+        ca_lower = camera_angle.lower()
+        is_framing = any(kw in ca_lower for kw in [
+            'close-up', 'close up', 'full body', 'medium shot', 'waist up',
+            'head and shoulders', 'portrait', 'wide shot', 'tight crop',
+            'headshot', 'half body', 'extreme close',
+        ])
+        if is_framing:
+            prompt = f'{camera_angle} of {prompt_template.replace("{subject}", subject_description)}'
+        else:
+            prompt = prompt_template.replace('{subject}', subject_description)
+            ca_suffix = camera_angle if 'angle' in ca_lower else f'{camera_angle} angle'
+            prompt = f'{prompt}, {ca_suffix}'
+    else:
+        prompt = prompt_template.replace('{subject}', subject_description)
 
     extra_parts = []
 
     if _is_set(outfit):
         extra_parts.append(f'wearing {outfit}')
 
+    if _is_set(makeup):
+        extra_parts.append(f'wearing {makeup}')
+
     if _is_set(pose):
         extra_parts.append(pose)
 
     if _is_set(background):
         bkg = background
-        if not bkg.lower().startswith('in '):
+        if not _has_preposition(bkg):
             bkg = f'in {bkg}'
         extra_parts.append(bkg)
 
     if _is_set(lighting):
         extra_parts.append(lighting)
-
-    if _is_set(camera_angle):
-        extra_parts.append(f'{camera_angle} shot')
 
     if _is_set(footwear):
         extra_parts.append(f'{footwear}')

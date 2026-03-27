@@ -83,7 +83,7 @@ def _resolve_pose_image(pose_reference_image, pose_editor_data):
 
 def _build_task_params(
     shoot_type_label, quality_label, image_number, image_seed, seed_random,
-    skin_tone, hair_style, hair_color,
+    skin_tone, hair_style, hair_color, hair_length,
     outfit, pose,
     makeup, expression,
     background,
@@ -107,6 +107,7 @@ def _build_task_params(
         skin_tone=skin_tone,
         hair_style=hair_style,
         hair_color=hair_color,
+        hair_length=hair_length,
         outfit=outfit,
         pose=pose,
         makeup=makeup,
@@ -161,7 +162,6 @@ def _build_task_params(
         'scheduler': 'karras',
         'disable_preview': False,
         'disable_intermediate_results': False,
-        'builder_enabled': False,
         '_freyra_always_show_results': True,
     }
 
@@ -538,6 +538,14 @@ def build_ui():
                 wire_dimension_resolver(dim_hair_color)
                 wire_image_interrogation(dim_hair_color, 'hair_color')
 
+                dim_hair_length = build_dimension_input(
+                    'hair_length', 'Hair Length',
+                    load_options('influencer_hair_lengths.txt'),
+                    allow_image=True,
+                )
+                wire_dimension_resolver(dim_hair_length)
+                wire_image_interrogation(dim_hair_length, 'hair_length')
+
                 dim_outfit = build_dimension_input(
                     'outfit', 'Outfit',
                     load_options('influencer_outfits.txt'),
@@ -798,7 +806,8 @@ def build_ui():
         # ── Wire: Surprise Me button ──
         all_dimensions = {
             'skin_tone': dim_skin, 'hair_style': dim_hair_style,
-            'hair_color': dim_hair_color, 'outfit': dim_outfit,
+            'hair_color': dim_hair_color, 'hair_length': dim_hair_length,
+            'outfit': dim_outfit,
             'pose': dim_pose, 'makeup': dim_makeup,
             'expression': dim_expression, 'background': dim_background,
             'lighting': dim_lighting, 'camera_angle': dim_camera,
@@ -808,6 +817,7 @@ def build_ui():
         randomize_outputs = [
             shoot_type,
             dim_hair_style['dropdown'],
+            dim_hair_length['dropdown'],
             dim_outfit['dropdown'],
             dim_pose['dropdown'],
             dim_makeup['dropdown'],
@@ -824,6 +834,7 @@ def build_ui():
             return [
                 rand_shoot,
                 dims.get('hair_style', NONE_OPTION),
+                dims.get('hair_length', NONE_OPTION),
                 dims.get('outfit', NONE_OPTION),
                 dims.get('pose', NONE_OPTION),
                 dims.get('makeup', NONE_OPTION),
@@ -856,7 +867,7 @@ def build_ui():
         all_preview_inputs = [
             shoot_type,
             dim_skin['resolved'], dim_hair_style['resolved'],
-            dim_hair_color['resolved'],
+            dim_hair_color['resolved'], dim_hair_length['resolved'],
             dim_outfit['resolved'], dim_pose['resolved'],
             dim_makeup['resolved'], dim_expression['resolved'],
             dim_background['resolved'],
@@ -866,7 +877,7 @@ def build_ui():
         ]
 
         def update_prompt_preview(
-            st, sk, hs, hc, ou, po, mk, ex, bg, lt, ca, fw, cp,
+            st, sk, hs, hc, hl, ou, po, mk, ex, bg, lt, ca, fw, cp,
         ):
             shoot = get_shoot_type(st)
             if shoot is None:
@@ -875,6 +886,7 @@ def build_ui():
             assembled = assemble_prompt(
                 shoot_type_config=shoot,
                 skin_tone=sk, hair_style=hs, hair_color=hc,
+                hair_length=hl,
                 outfit=ou, pose=po,
                 makeup=mk, expression=ex,
                 background=bg, lighting=lt,
@@ -977,7 +989,7 @@ def build_ui():
         generation_inputs = [
             shoot_type, quality_mode, image_number, image_seed, seed_random,
             dim_skin['resolved'], dim_hair_style['resolved'],
-            dim_hair_color['resolved'],
+            dim_hair_color['resolved'], dim_hair_length['resolved'],
             dim_outfit['resolved'], dim_pose['resolved'],
             dim_makeup['resolved'], dim_expression['resolved'],
             dim_background['resolved'],
@@ -1029,7 +1041,7 @@ def build_ui():
 
             st = _next(); qm = _next(); img_num = _next()
             img_seed = _next(); seed_rnd = _next()
-            sk = _next(); hs = _next(); hc = _next()
+            sk = _next(); hs = _next(); hc = _next(); hl = _next()
             ou = _next(); po = _next()
             mk = _next(); ex = _next()
             bg = _next()
@@ -1040,8 +1052,6 @@ def build_ui():
             pose_ref_img = _next(); pose_ed_data = _next()
             adv_enabled = _next()
 
-            # Always consume the advanced args from the inputs list
-            # (Gradio passes them regardless of checkbox state)
             adv_values = {}
             for ak in adv_input_keys:
                 if adv.get(ak) is not None:
@@ -1054,7 +1064,7 @@ def build_ui():
             params, seed = _build_task_params(
                 shoot_type_label=st, quality_label=qm,
                 image_number=img_num, image_seed=img_seed, seed_random=seed_rnd,
-                skin_tone=sk, hair_style=hs, hair_color=hc,
+                skin_tone=sk, hair_style=hs, hair_color=hc, hair_length=hl,
                 outfit=ou, pose=po,
                 makeup=mk, expression=ex,
                 background=bg,

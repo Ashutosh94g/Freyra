@@ -44,6 +44,9 @@ args_parser.parser.add_argument("--tunnel", type=str, default='gradio',
                                 choices=['gradio', 'cloudflared', 'both'],
                                 help="Tunnel method for public URL: gradio (default), cloudflared, or both.")
 
+args_parser.parser.add_argument("--legacy-ui", action='store_true',
+                                help="Launch the original general-purpose UI instead of the influencer studio.")
+
 # --- Phase 5: Generation default overrides via CLI ---
 args_parser.parser.add_argument("--default-prompt", type=str, default=None,
                                 help="Override default prompt text.")

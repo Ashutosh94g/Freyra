@@ -233,5 +233,8 @@ if not os.path.isfile(inswapper_path):
     else:
         print('[FaceSwap] Could not download inswapper_128.onnx -- face swap will be disabled.')
 
-from ui.app import launch_app
-launch_app()
+if args.legacy_ui:
+    import webui
+else:
+    from ui.app import launch_app
+    launch_app()

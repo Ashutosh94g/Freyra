@@ -1,11 +1,66 @@
 """Freyra Image Interrogator -- extract per-dimension descriptions from reference images.
 
-Wraps the existing BLIP interrogator to provide dimension-aware captions.
-When a user uploads a reference image for a creative dimension (outfit, lighting,
-background, etc.), this module extracts a relevant text description.
+Uses Moondream2, a lightweight VLM (~1.7B params, ~3.5GB fp16), to answer
+targeted questions about each creative dimension. Instead of captioning then
+keyword-matching (the old BLIP approach), we ask dimension-specific questions
+like "Describe the lighting in this photo" and get usable prompt fragments.
+
+VRAM: Safe on T4 because interrogation runs before SDXL loads. The model is
+unloaded from GPU after each call via the existing model_management system.
+Falls back to BLIP captioning if Moondream cannot be loaded.
 """
 
 import re
+
+DIMENSION_QUESTIONS = {
+    'outfit': (
+        "Describe exactly what this person is wearing. Include colors, fabrics, "
+        "and style details. Be concise, use comma-separated descriptors."
+    ),
+    'lighting': (
+        "Describe the lighting in this photo: direction, quality, color temperature, "
+        "and mood. Be concise, use comma-separated descriptors."
+    ),
+    'pose': (
+        "Describe this person's body pose and positioning in detail. "
+        "Be concise, use comma-separated descriptors."
+    ),
+    'background': (
+        "Describe the background setting and environment in this photo. "
+        "Be concise, use comma-separated descriptors."
+    ),
+    'makeup': (
+        "Describe the makeup this person is wearing, including lip color, "
+        "eye makeup, and skin finish. Be concise, use comma-separated descriptors."
+    ),
+    'expression': (
+        "Describe this person's facial expression and mood in a few words."
+    ),
+    'hair_style': (
+        "Describe this person's hairstyle: cut, texture, and how it is styled. "
+        "Be concise, use comma-separated descriptors."
+    ),
+    'hair_color': (
+        "What is this person's hair color? Be specific about shade and any "
+        "highlights or gradients. Answer in a few words only."
+    ),
+    'hair_length': (
+        "Describe this person's hair length in a few words "
+        "(e.g. cropped, chin length, shoulder length, waist length)."
+    ),
+    'camera_angle': (
+        "What camera angle and framing is used in this photo? Is it a close-up, "
+        "medium shot, full body, high angle, low angle, etc? Answer in a few words."
+    ),
+    'footwear': (
+        "Describe the shoes or footwear visible in this image. "
+        "Include type, color, and style. Be concise."
+    ),
+    'skin_tone': (
+        "Describe this person's skin tone in a few words "
+        "(e.g. fair porcelain, medium olive, dark brown, deep ebony)."
+    ),
+}
 
 DIMENSION_KEYWORDS = {
     'outfit': [
@@ -63,6 +118,10 @@ DIMENSION_KEYWORDS = {
         'ombre', 'balayage', 'highlights', 'platinum', 'caramel',
         'chestnut', 'honey', 'strawberry', 'ash', 'golden', 'rose gold',
     ],
+    'hair_length': [
+        'cropped', 'buzz', 'short', 'ear length', 'chin length', 'bob',
+        'shoulder length', 'medium', 'long', 'waist length', 'hip length',
+    ],
     'camera_angle': [
         'close-up', 'wide shot', 'portrait', 'full body', 'profile',
         'overhead', 'low angle', 'high angle', 'dutch angle', 'front',
@@ -79,43 +138,115 @@ DIMENSION_KEYWORDS = {
     ],
 }
 
-_interrogator_instance = None
+
+_moondream_model = None
+_moondream_tokenizer = None
+_use_blip_fallback = False
 
 
-def _get_interrogator():
-    global _interrogator_instance
-    if _interrogator_instance is None:
-        from extras.interrogate import Interrogator
-        _interrogator_instance = Interrogator()
-    return _interrogator_instance
+def _load_moondream():
+    """Lazy-load Moondream2. Returns (model, tokenizer) or raises on failure."""
+    global _moondream_model, _moondream_tokenizer
 
+    if _moondream_model is not None:
+        return _moondream_model, _moondream_tokenizer
 
-def _caption_image(img_rgb) -> str:
-    """Run BLIP captioning on an RGB image (numpy array or PIL)."""
-    from PIL import Image
-    import numpy as np
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    if img_rgb is None:
-        return ''
+    print('[Freyra] Loading Moondream2 VLM for image understanding...')
 
-    if isinstance(img_rgb, np.ndarray):
-        pil_img = Image.fromarray(img_rgb).convert('RGB')
-    elif isinstance(img_rgb, Image.Image):
-        pil_img = img_rgb.convert('RGB')
-    else:
-        return ''
-
+    device = 'cpu'
+    dtype = torch.float32
     try:
-        interrogator = _get_interrogator()
+        import ldm_patched.modules.model_management as mm
+        if torch.cuda.is_available():
+            device = mm.text_encoder_device()
+            if mm.should_use_fp16(device=device):
+                dtype = torch.float16
+    except Exception:
+        if torch.cuda.is_available():
+            device = 'cuda'
+            dtype = torch.float16
+
+    _moondream_model = AutoModelForCausalLM.from_pretrained(
+        'vikhyatk/moondream2',
+        trust_remote_code=True,
+        torch_dtype=dtype,
+        device_map={'': device},
+    )
+    _moondream_tokenizer = AutoTokenizer.from_pretrained(
+        'vikhyatk/moondream2',
+        trust_remote_code=True,
+    )
+
+    print(f'[Freyra] Moondream2 loaded on {device} ({dtype})')
+    return _moondream_model, _moondream_tokenizer
+
+
+def _unload_moondream():
+    """Move Moondream to CPU / free VRAM for the generation pipeline."""
+    global _moondream_model
+    if _moondream_model is None:
+        return
+    try:
+        import torch
+        _moondream_model.to('cpu')
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:
+        pass
+
+
+def _query_moondream(pil_img, question: str) -> str:
+    """Ask Moondream2 a question about an image. Returns the answer string."""
+    model, tokenizer = _load_moondream()
+
+    enc_image = model.encode_image(pil_img)
+    answer = model.answer_question(enc_image, question, tokenizer)
+
+    _unload_moondream()
+    return answer.strip() if answer else ''
+
+
+def _blip_fallback(pil_img) -> str:
+    """Fall back to BLIP captioning when Moondream is unavailable."""
+    try:
+        from extras.interrogate import Interrogator
+        interrogator = Interrogator()
         caption = interrogator.interrogate(pil_img)
         return caption.strip() if caption else ''
     except Exception as e:
-        print(f'[Freyra] Image interrogation failed: {e}')
+        print(f'[Freyra] BLIP fallback also failed: {e}')
         return ''
 
 
+def _clean_response(text: str) -> str:
+    """Strip conversational filler from VLM output to get a clean prompt fragment."""
+    text = text.strip()
+    prefixes_to_strip = [
+        'the person is wearing ', 'she is wearing ', 'they are wearing ',
+        'the lighting is ', 'the background is ', 'the person has ',
+        'she has ', 'the makeup is ', 'the expression is ',
+        'the hairstyle is ', 'the hair color is ', 'the hair length is ',
+        'the camera angle is ', 'the footwear is ', 'the skin tone is ',
+        'in this photo, ', 'in this image, ', 'this photo shows ',
+        'the image shows ', 'i can see ',
+    ]
+    text_lower = text.lower()
+    for prefix in prefixes_to_strip:
+        if text_lower.startswith(prefix):
+            text = text[len(prefix):]
+            text_lower = text.lower()
+
+    text = text.rstrip('.')
+    return text.strip()
+
+
 def _extract_relevant_phrases(caption: str, dimension: str) -> str:
-    """Filter a BLIP caption to keep only phrases relevant to a dimension."""
+    """Filter a caption to keep only phrases relevant to a dimension.
+    Used as post-processing for both Moondream and BLIP outputs.
+    """
     keywords = DIMENSION_KEYWORDS.get(dimension, [])
     if not keywords:
         return caption
@@ -142,20 +273,43 @@ def _extract_relevant_phrases(caption: str, dimension: str) -> str:
 def describe_for_dimension(image, dimension_name: str) -> str:
     """Extract a dimension-relevant description from a reference image.
 
+    Uses Moondream2 to answer a targeted question for the given dimension.
+    Falls back to BLIP captioning + keyword extraction if Moondream fails.
+
     Args:
         image: numpy array or PIL Image
-        dimension_name: one of the keys in DIMENSION_KEYWORDS
-            (outfit, pose, background, lighting, makeup, expression,
-             hair_style, hair_color, camera_angle, footwear, skin_tone)
+        dimension_name: one of the keys in DIMENSION_QUESTIONS
 
     Returns:
         A text description relevant to that dimension, or empty string on failure.
     """
+    global _use_blip_fallback
+
     if image is None:
         return ''
 
-    caption = _caption_image(image)
-    if not caption:
+    from PIL import Image
+    import numpy as np
+
+    if isinstance(image, np.ndarray):
+        pil_img = Image.fromarray(image).convert('RGB')
+    elif isinstance(image, Image.Image):
+        pil_img = image.convert('RGB')
+    else:
         return ''
 
+    question = DIMENSION_QUESTIONS.get(dimension_name)
+
+    if not _use_blip_fallback and question:
+        try:
+            answer = _query_moondream(pil_img, question)
+            if answer:
+                return _clean_response(answer)
+        except Exception as e:
+            print(f'[Freyra] Moondream2 failed, falling back to BLIP: {e}')
+            _use_blip_fallback = True
+
+    caption = _blip_fallback(pil_img)
+    if not caption:
+        return ''
     return _extract_relevant_phrases(caption, dimension_name)

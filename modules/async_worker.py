@@ -267,14 +267,6 @@ class AsyncTask:
         task.save_metadata_to_images = params.get('save_metadata_to_images', config.default_save_metadata_to_images)
         task.metadata_scheme = MetadataScheme(params.get('metadata_scheme', config.default_metadata_scheme))
 
-        # Influencer Builder (API support)
-        task.builder_enabled = params.get('builder_enabled', config.default_builder_enabled)
-        builder_input = params.get('builder', {})
-        from modules.influencer_builder import BUILDER_CATEGORIES
-        task.builder_values = {}
-        for cat_key, _wf in BUILDER_CATEGORIES:
-            task.builder_values[cat_key] = builder_input.get(cat_key, '')
-
         # ControlNet (empty for text-to-image API)
         task.cn_tasks = {x: [] for x in ip_list}
 
@@ -811,14 +803,6 @@ def worker():
         negative_prompts = remove_empty_str([safe_str(p) for p in negative_prompt.splitlines()], default='')
         prompt = prompts[0]
         negative_prompt = negative_prompts[0]
-
-        # Prepend Influencer Builder prompt if enabled
-        if getattr(async_task, 'builder_enabled', False) and hasattr(async_task, 'builder_values'):
-            from modules.influencer_builder import assemble_builder_prompt
-            builder_prompt = assemble_builder_prompt(**async_task.builder_values)
-            if builder_prompt:
-                prompt = f'{builder_prompt}, {prompt}' if prompt else builder_prompt
-                print(f'[Builder] Assembled prompt: {builder_prompt}')
 
         if prompt == '':
             # disable expansion when empty since it is not meaningful and influences image prompt
