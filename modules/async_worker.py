@@ -192,7 +192,11 @@ class AsyncTask:
         if not Performance.has_restricted_features(task.performance_selection) and task.generation_steps > 0:
             task.steps = task.generation_steps
             task.original_steps = task.steps
-        task.aspect_ratios_selection = params.get('aspect_ratio', config.default_aspect_ratio.split('\u00d7')[0].strip() if '\u00d7' in str(config.default_aspect_ratio) else str(config.default_aspect_ratio))
+        def _clean_ar(ar_str):
+            parts = ar_str.replace('×', '*').split('*')[:2]
+            return '*'.join(p.strip().split()[0].split('<')[0] for p in parts)
+
+        task.aspect_ratios_selection = params.get('aspect_ratio', _clean_ar(str(config.default_aspect_ratio)))
         task.image_number = params.get('image_number', config.default_image_number)
         task.output_format = params.get('output_format', config.default_output_format)
         task.seed = int(params.get('seed', -1))
@@ -1288,8 +1292,8 @@ def worker():
         tiled = False
 
         _ar = async_task.aspect_ratios_selection.replace('×', '*').split('*')[:2]
-        width, height = _ar[0].strip(), _ar[1].strip() if len(_ar) > 1 else _ar[0].strip()
-        width, height = int(width), int(height)
+        width = int(_ar[0].strip().split()[0].split('<')[0])
+        height = int(_ar[1].strip().split()[0].split('<')[0]) if len(_ar) > 1 else width
 
         skip_prompt_processing = False
 
